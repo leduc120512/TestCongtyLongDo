@@ -34,10 +34,10 @@ Web lên Vercel, API lên Render, dữ liệu trên MongoDB Atlas (gói M0 miễ
 1. **Atlas:** tạo cluster M0 (nên chọn vùng Singapore), tạo user DB, mở Network Access cho `0.0.0.0/0` vì Render gói miễn phí không có IP cố định. Lấy chuỗi kết nối rồi chèn tên DB: `mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/longdo_congviec?retryWrites=true&w=majority`.
 2. **Seed Atlas một lần** từ máy. Seed xóa sạch dữ liệu, chỉ chạy lúc đầu:
    ```powershell
-   $env:MONGO_URL="<chuỗi Atlas>"; pnpm seed
+   $env:MONGO_URL='<chuỗi Atlas>'; pnpm seed
    ```
-3. **Render:** New → Blueprint → chọn repo. `render.yaml` đã khai báo lệnh build/chạy, `HOST`, `JWT_SECRET` (Render tự sinh) và `ALLOW_MOCK_LOGIN`; Render chỉ hỏi `MONGO_URL`. Kiểm tra `https://<tên-dịch-vụ>.onrender.com/api/suc-khoe` trả `{"data":{"ok":true}}`.
-4. **Vercel:** Add New → Project → chọn repo, Root Directory là `apps/web` (Vercel tự nhận Vite và pnpm workspace). Nếu địa chỉ Render khác `longdo-congviec-api.onrender.com` thì sửa `destination` trong `apps/web/vercel.json`.
+3. **Render:** New → Blueprint → chọn repo. `render.yaml` đã khai báo lệnh build/chạy, `HOST`, `JWT_SECRET` (Render tự sinh) và `ALLOW_MOCK_LOGIN`; Render chỉ hỏi `MONGO_URL`. Tạo tay bằng New → Web Service cũng được, điền đúng các giá trị trong `render.yaml`. Kiểm tra `https://<tên-dịch-vụ>.onrender.com/api/suc-khoe` trả `{"data":{"ok":true}}`.
+4. **Vercel:** Add New → Project → chọn repo, Root Directory là `apps/web` (Vercel tự nhận Vite và pnpm workspace). `apps/web/vercel.json` đang trỏ `/api` tới `testcongtylongdo.onrender.com`; đổi dịch vụ Render thì sửa `destination`.
 
 Render luôn đặt `NODE_ENV=production`, nên bản demo cần `ALLOW_MOCK_LOGIN=true` mới có ô chọn người đăng nhập. Gói miễn phí của Render ngủ sau 15 phút không có truy cập; lần mở đầu tiên sau đó mất khoảng 1 phút.
 
