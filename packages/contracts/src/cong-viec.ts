@@ -179,6 +179,20 @@ export const VietBinhLuanSchema = z.object({
 })
 export type VietBinhLuan = z.infer<typeof VietBinhLuanSchema>
 
+// ---------- Tham số đường dẫn và query đếm ----------
+
+export const ThamSoIdSchema = z.object({ id: IdSchema })
+export const ThamSoViecConSchema = z.object({ id: IdSchema, viecConId: IdSchema })
+
+/** Query của /cong-viec/dem: các bộ lọc phụ của danh sách (không có lọc nhanh, trang, sắp xếp). */
+export const DemCongViecQuerySchema = DanhSachCongViecQuerySchema.pick({
+  duAnId: true,
+  trangThai: true,
+  uuTien: true,
+  q: true,
+})
+export type DemCongViecQuery = z.output<typeof DemCongViecQuerySchema>
+
 // ---------- Dữ liệu trả về ----------
 
 export const CongViecSchema = z.object({

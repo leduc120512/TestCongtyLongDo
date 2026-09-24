@@ -6,7 +6,9 @@ import {
   VietBinhLuanSchema,
   type BinhLuan,
   DanhSachCongViecQuerySchema,
-  IdSchema,
+  DemCongViecQuerySchema,
+  ThamSoIdSchema,
+  ThamSoViecConSchema,
   SuaCongViecSchema,
   TaoCongViecSchema,
   type ChiTietCongViec,
@@ -17,13 +19,9 @@ import {
   type ThongKeNhanh,
 } from '@longdo/contracts'
 import type { FastifyInstance } from 'fastify'
-import { z } from 'zod'
 import { kiemTra } from '../loi.ts'
 import type { CongViecService } from '../services/cong-viec.service.ts'
 
-const ThamSoIdSchema = z.object({ id: IdSchema })
-const ThamSoViecConSchema = z.object({ id: IdSchema, viecConId: IdSchema })
-const DemQuerySchema = DanhSachCongViecQuerySchema.pick({ duAnId: true, trangThai: true, uuTien: true, q: true })
 
 /**
  * Route chỉ làm 3 việc: validate đầu vào bằng schema trong contracts, gọi service với req.user
@@ -37,7 +35,7 @@ export function congViecRoutes(congViec: CongViecService) {
     })
 
     app.get('/cong-viec/dem', async (req): Promise<PhanHoi<ThongKeNhanh>> => {
-      const q = kiemTra(DemQuerySchema, req.query, { boRong: true })
+      const q = kiemTra(DemCongViecQuerySchema, req.query, { boRong: true })
       return { data: await congViec.demLocNhanh(req.user, q) }
     })
 

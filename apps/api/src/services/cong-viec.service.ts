@@ -13,6 +13,7 @@ import {
   type ChuyenTrangThai,
   type CongViec,
   type DanhSachCongViecQuery,
+  type DemCongViecQuery,
   type HanhDongLichSu,
   type LichSu,
   type NguoiDung,
@@ -72,7 +73,7 @@ export class CongViecService {
   }
 
   /** Số việc ở mỗi lọc nhanh, áp cùng các bộ lọc phụ (dự án, trạng thái, ưu tiên, từ khóa). */
-  async demLocNhanh(nd: NguoiDung, q: Omit<DanhSachCongViecQuery, 'nhanh' | 'page' | 'limit' | 'sapXep'>): Promise<ThongKeNhanh> {
+  async demLocNhanh(nd: NguoiDung, q: DemCongViecQuery): Promise<ThongKeNhanh> {
     return this.kho.congViec.demTheoLocNhanh(this.boLocChung(nd, q, this.dongHo()))
   }
 
