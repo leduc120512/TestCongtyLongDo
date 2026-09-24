@@ -1,62 +1,62 @@
 import type {
-  BinhLuan,
-  CapNhatTienDo,
-  ChiTietCongViec,
-  ChuyenTrangThai,
-  CongViec,
-  DanhSachCongViecQuery,
-  LichSu,
-  PhanHoi,
-  PhanHoiDanhSach,
-  SuaCongViecInput,
-  TaoCongViec,
-  ThongKeNhanh,
+  TaskComment,
+  UpdateProgress,
+  TaskDetail,
+  ChangeStatus,
+  Task,
+  TaskListQuery,
+  HistoryEntry,
+  ApiResponse,
+  ApiListResponse,
+  UpdateTaskInput,
+  CreateTask,
+  QuickFilterCounts,
 } from '@longdo/contracts'
-import { goiApi } from './http'
+import { callApi } from './http'
 
-export type BoLocDem = Pick<DanhSachCongViecQuery, 'duAnId' | 'trangThai' | 'uuTien' | 'q'>
+export type CountFilter = Pick<TaskListQuery, 'duAnId' | 'trangThai' | 'uuTien' | 'q'>
 
-export const congViecApi = {
-  danhSach: (q: DanhSachCongViecQuery) =>
-    goiApi<PhanHoiDanhSach<CongViec>>('/cong-viec', { query: q }),
+export const taskApi = {
+  list: (q: TaskListQuery) =>
+    callApi<ApiListResponse<Task>>('/cong-viec', { query: q }),
 
-  dem: async (q: BoLocDem) => (await goiApi<PhanHoi<ThongKeNhanh>>('/cong-viec/dem', { query: q })).data,
+  count: async (q: CountFilter) => (await callApi<ApiResponse<QuickFilterCounts>>('/cong-viec/dem', { query: q })).data,
 
-  chiTiet: async (id: string) => (await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}`)).data,
+  get: async (id: string) => (await callApi<ApiResponse<TaskDetail>>(`/cong-viec/${id}`)).data,
 
-  lichSu: async (id: string) => (await goiApi<PhanHoi<LichSu[]>>(`/cong-viec/${id}/lich-su`)).data,
+  history: async (id: string) => (await callApi<ApiResponse<HistoryEntry[]>>(`/cong-viec/${id}/lich-su`)).data,
 
-  tao: async (body: TaoCongViec) =>
-    (await goiApi<PhanHoi<ChiTietCongViec>>('/cong-viec', { method: 'POST', body })).data,
+  create: async (body: CreateTask) =>
+    (await callApi<ApiResponse<TaskDetail>>('/cong-viec', { method: 'POST', body })).data,
 
-  sua: async (id: string, body: SuaCongViecInput) =>
-    (await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}`, { method: 'PATCH', body })).data,
+  update: async (id: string, body: UpdateTaskInput) =>
+    (await callApi<ApiResponse<TaskDetail>>(`/cong-viec/${id}`, { method: 'PATCH', body })).data,
 
-  chuyenTrangThai: async (id: string, body: ChuyenTrangThai) =>
-    (await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}/trang-thai`, { method: 'POST', body })).data,
+  changeStatus: async (id: string, body: ChangeStatus) =>
+    (await callApi<ApiResponse<TaskDetail>>(`/cong-viec/${id}/trang-thai`, { method: 'POST', body })).data,
 
-  capNhatTienDo: async (id: string, body: CapNhatTienDo) =>
-    (await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}/tien-do`, { method: 'POST', body })).data,
+  updateProgress: async (id: string, body: UpdateProgress) =>
+    (await callApi<ApiResponse<TaskDetail>>(`/cong-viec/${id}/tien-do`, { method: 'POST', body })).data,
 
-  xoa: async (id: string) =>
-    (await goiApi<PhanHoi<{ id: string }>>(`/cong-viec/${id}`, { method: 'DELETE' })).data,
+  remove: async (id: string) =>
+    (await callApi<ApiResponse<{ id: string }>>(`/cong-viec/${id}`, { method: 'DELETE' })).data,
 
-  themViecCon: async (id: string, ten: string) =>
-    (await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}/viec-con`, { method: 'POST', body: { ten } })).data,
+  addSubtask: async (id: string, name: string) =>
+    (await callApi<ApiResponse<TaskDetail>>(`/cong-viec/${id}/viec-con`, { method: 'POST', body: { ten: name } })).data,
 
-  danhDauViecCon: async (id: string, viecConId: string, xong: boolean) =>
+  markSubtask: async (id: string, subtaskId: string, done: boolean) =>
     (
-      await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}/viec-con/${viecConId}/danh-dau`, {
+      await callApi<ApiResponse<TaskDetail>>(`/cong-viec/${id}/viec-con/${subtaskId}/danh-dau`, {
         method: 'POST',
-        body: { xong },
+        body: { xong: done },
       })
     ).data,
 
-  xoaViecCon: async (id: string, viecConId: string) =>
-    (await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}/viec-con/${viecConId}`, { method: 'DELETE' })).data,
+  removeSubtask: async (id: string, subtaskId: string) =>
+    (await callApi<ApiResponse<TaskDetail>>(`/cong-viec/${id}/viec-con/${subtaskId}`, { method: 'DELETE' })).data,
 
-  binhLuan: async (id: string) => (await goiApi<PhanHoi<BinhLuan[]>>(`/cong-viec/${id}/binh-luan`)).data,
+  comments: async (id: string) => (await callApi<ApiResponse<TaskComment[]>>(`/cong-viec/${id}/binh-luan`)).data,
 
-  vietBinhLuan: async (id: string, noiDung: string) =>
-    (await goiApi<PhanHoi<BinhLuan>>(`/cong-viec/${id}/binh-luan`, { method: 'POST', body: { noiDung } })).data,
+  addComment: async (id: string, content: string) =>
+    (await callApi<ApiResponse<TaskComment>>(`/cong-viec/${id}/binh-luan`, { method: 'POST', body: { noiDung: content } })).data,
 }

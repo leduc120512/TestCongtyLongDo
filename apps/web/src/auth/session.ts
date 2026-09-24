@@ -1,46 +1,46 @@
-import type { NhanVien } from '@longdo/contracts'
+import type { Employee } from '@longdo/contracts'
 import { useSyncExternalStore } from 'react'
 
 /**
  * Phiên đăng nhập giả lập: token + nhân viên đang đóng vai.
  * Lưu ở sessionStorage để mỗi tab có thể là một người khác nhau (tiện demo người giao và người thực hiện).
  */
-export type Phien = { token: string; nhanVien: NhanVien }
+export type Session = { token: string; nhanVien: Employee }
 
-const KHOA = 'longdo.phien'
-const nguoiNghe = new Set<() => void>()
+const STORAGE_KEY = 'longdo.session'
+const listeners = new Set<() => void>()
 
-function docLuu(): Phien | null {
+function readStoredSession(): Session | null {
   try {
-    const s = sessionStorage.getItem(KHOA)
-    return s ? (JSON.parse(s) as Phien) : null
+    const s = sessionStorage.getItem(STORAGE_KEY)
+    return s ? (JSON.parse(s) as Session) : null
   } catch {
     return null
   }
 }
 
-let hienTai: Phien | null = docLuu()
+let current: Session | null = readStoredSession()
 
-export function layPhien(): Phien | null {
-  return hienTai
+export function getSession(): Session | null {
+  return current
 }
 
-export function datPhien(phien: Phien | null): void {
-  hienTai = phien
+export function setSession(session: Session | null): void {
+  current = session
   try {
-    if (phien) sessionStorage.setItem(KHOA, JSON.stringify(phien))
-    else sessionStorage.removeItem(KHOA)
+    if (session) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+    else sessionStorage.removeItem(STORAGE_KEY)
   } catch {
     // trình duyệt chặn storage — vẫn chạy được trong bộ nhớ
   }
-  nguoiNghe.forEach((f) => f())
+  listeners.forEach((f) => f())
 }
 
-function dangKy(f: () => void) {
-  nguoiNghe.add(f)
-  return () => nguoiNghe.delete(f)
+function subscribe(f: () => void) {
+  listeners.add(f)
+  return () => listeners.delete(f)
 }
 
-export function usePhien(): Phien | null {
-  return useSyncExternalStore(dangKy, layPhien)
+export function useSession(): Session | null {
+  return useSyncExternalStore(subscribe, getSession)
 }

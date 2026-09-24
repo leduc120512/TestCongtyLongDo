@@ -1,115 +1,115 @@
 import {
-  DU_AN_CHUNG,
-  LOC_NHANH,
-  TEN_LOC_NHANH,
-  TEN_TRANG_THAI,
-  TEN_UU_TIEN,
-  TRANG_THAI,
-  UU_TIEN,
-  type LocTrangThai,
-  type UuTien,
+  NO_PROJECT,
+  QUICK_FILTERS,
+  QUICK_FILTER_LABELS,
+  STATUS_LABELS,
+  PRIORITY_LABELS,
+  TASK_STATUSES,
+  PRIORITIES,
+  type StatusFilter,
+  type Priority,
 } from '@longdo/contracts'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { dinhDangNgay } from '../components/format'
-import { NhanTrangThai, NhanUuTien } from '../components/Badges'
-import { PhanTrang } from '../components/Pagination'
-import { CoLoi, DangTai, KhongCoDuLieu } from '../components/LoadingState'
-import { useBoLocUrl, useTreGiaTri } from '../hooks/useUrlFilters'
-import { useDanhSachCongViec, useDemLocNhanh } from '../hooks/useTasks'
-import { useDuAn, useTraCuu } from '../hooks/useCatalog'
+import { formatDate } from '../components/format'
+import { StatusBadge, PriorityBadge } from '../components/Badges'
+import { Pagination } from '../components/Pagination'
+import { ErrorState, Loading, EmptyState } from '../components/LoadingState'
+import { useUrlFilters, useDebouncedValue } from '../hooks/useUrlFilters'
+import { useTaskList, useQuickFilterCounts } from '../hooks/useTasks'
+import { useProjects, useLookup } from '../hooks/useCatalog'
 
-export default function DanhSachPage() {
-  const { boLoc, doiBoLoc } = useBoLocUrl()
-  const ds = useDanhSachCongViec(boLoc)
-  const dem = useDemLocNhanh({ duAnId: boLoc.duAnId, trangThai: boLoc.trangThai, uuTien: boLoc.uuTien, q: boLoc.q })
-  const duAn = useDuAn()
-  const tra = useTraCuu()
+export default function ListPage() {
+  const { filters, setFilters } = useUrlFilters()
+  const list = useTaskList(filters)
+  const counts = useQuickFilterCounts({ duAnId: filters.duAnId, trangThai: filters.trangThai, uuTien: filters.uuTien, q: filters.q })
+  const projects = useProjects()
+  const lookup = useLookup()
 
   // Ô tìm kiếm: gõ tới đâu hiện tới đó, nhưng chỉ đưa lên URL (và gọi API) sau khi ngừng gõ 300ms.
-  // daGui nhớ giá trị đã đưa lên gần nhất, để chỉ đồng bộ khi giá trị đã trễ thật sự đổi — tránh
+  // lastSent nhớ giá trị đã đưa lên gần nhất, để chỉ đồng bộ khi giá trị đã trễ thật sự đổi — tránh
   // gắn lại từ khóa cũ khi vừa bấm "Xóa bộ lọc".
-  const [tuKhoa, setTuKhoa] = useState(boLoc.q ?? '')
-  const tuKhoaTre = useTreGiaTri(tuKhoa)
-  const daGui = useRef(boLoc.q)
+  const [keyword, setKeyword] = useState(filters.q ?? '')
+  const debouncedKeyword = useDebouncedValue(keyword)
+  const lastSent = useRef(filters.q)
   useEffect(() => {
-    const q = tuKhoaTre.trim() || undefined
-    if (q !== daGui.current) {
-      daGui.current = q
-      doiBoLoc({ q })
+    const q = debouncedKeyword.trim() || undefined
+    if (q !== lastSent.current) {
+      lastSent.current = q
+      setFilters({ q })
     }
-  }, [tuKhoaTre, doiBoLoc])
+  }, [debouncedKeyword, setFilters])
 
-  const coLocPhu = !!(boLoc.duAnId || boLoc.trangThai || boLoc.uuTien || boLoc.q)
-  const xoaLoc = () => {
-    setTuKhoa('')
-    daGui.current = undefined
-    doiBoLoc({ duAnId: undefined, trangThai: undefined, uuTien: undefined, q: undefined })
+  const hasExtraFilters = !!(filters.duAnId || filters.trangThai || filters.uuTien || filters.q)
+  const clearFilters = () => {
+    setKeyword('')
+    lastSent.current = undefined
+    setFilters({ duAnId: undefined, trangThai: undefined, uuTien: undefined, q: undefined })
   }
-  const thuLaiTatCa = () => {
-    void ds.refetch()
-    void dem.refetch()
+  const retryAll = () => {
+    void list.refetch()
+    void counts.refetch()
   }
 
   return (
     <section>
-      <div className="tieu-de-trang">
+      <div className="page-header">
         <h1>Công việc</h1>
-        <Link to="/cong-viec/tao" className="nut">
+        <Link to="/cong-viec/tao" className="button">
           + Tạo công việc
         </Link>
       </div>
 
-      <div className="the-loc" role="tablist" aria-label="Lọc nhanh">
-        {LOC_NHANH.map((n) => (
+      <div className="tabs" role="tablist" aria-label="Lọc nhanh">
+        {QUICK_FILTERS.map((n) => (
           <button
             key={n}
             type="button"
             role="tab"
-            aria-selected={boLoc.nhanh === n}
-            className={boLoc.nhanh === n ? 'the dang-chon' : 'the'}
-            onClick={() => doiBoLoc({ nhanh: n })}
+            aria-selected={filters.nhanh === n}
+            className={filters.nhanh === n ? 'tab selected' : 'tab'}
+            onClick={() => setFilters({ nhanh: n })}
           >
-            {TEN_LOC_NHANH[n]}
-            <span className="dem">{dem.data ? dem.data[n] : dem.isError ? '!' : '…'}</span>
+            {QUICK_FILTER_LABELS[n]}
+            <span className="count">{counts.data ? counts.data[n] : counts.isError ? '!' : '…'}</span>
           </button>
         ))}
       </div>
 
-      {dem.isError && !ds.isError && (
-        <p className="loi-khoi" role="alert">
-          Không tải được số lượng việc: {dem.error.message}{' '}
-          <button type="button" className="lien-ket" onClick={() => dem.refetch()}>
+      {counts.isError && !list.isError && (
+        <p className="error-block" role="alert">
+          Không tải được số lượng việc: {counts.error.message}{' '}
+          <button type="button" className="link-button" onClick={() => counts.refetch()}>
             Thử lại
           </button>
         </p>
       )}
-      {tra.loi && (
-        <p className="loi-khoi" role="alert">
-          Không tải được danh sách nhân viên/dự án: {tra.loi.message}{' '}
-          <button type="button" className="lien-ket" onClick={tra.thuLai}>
+      {lookup.error && (
+        <p className="error-block" role="alert">
+          Không tải được danh sách nhân viên/dự án: {lookup.error.message}{' '}
+          <button type="button" className="link-button" onClick={lookup.retry}>
             Thử lại
           </button>
         </p>
       )}
 
-      <div className="thanh-loc">
+      <div className="filter-bar">
         <input
           type="search"
           maxLength={100}
           placeholder="Tìm theo tên hoặc mã (vd. CV-0012, nghiem thu)"
-          value={tuKhoa}
-          onChange={(e) => setTuKhoa(e.target.value)}
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
           aria-label="Tìm theo tên hoặc mã"
         />
         <select
           aria-label="Lọc theo dự án"
-          value={boLoc.duAnId ?? ''}
-          onChange={(e) => doiBoLoc({ duAnId: e.target.value || undefined })}
+          value={filters.duAnId ?? ''}
+          onChange={(e) => setFilters({ duAnId: e.target.value || undefined })}
         >
           <option value="">Tất cả dự án</option>
-          <option value={DU_AN_CHUNG}>Việc chung</option>
-          {duAn.data?.map((d) => (
+          <option value={NO_PROJECT}>Việc chung</option>
+          {projects.data?.map((d) => (
             <option key={d.id} value={d.id}>
               {d.ten}
             </option>
@@ -117,60 +117,60 @@ export default function DanhSachPage() {
         </select>
         <select
           aria-label="Lọc theo trạng thái"
-          value={boLoc.trangThai ?? ''}
-          onChange={(e) => doiBoLoc({ trangThai: (e.target.value || undefined) as LocTrangThai | undefined })}
+          value={filters.trangThai ?? ''}
+          onChange={(e) => setFilters({ trangThai: (e.target.value || undefined) as StatusFilter | undefined })}
         >
           <option value="">Mọi trạng thái</option>
-          {TRANG_THAI.map((t) => (
+          {TASK_STATUSES.map((t) => (
             <option key={t} value={t}>
-              {TEN_TRANG_THAI[t]}
+              {STATUS_LABELS[t]}
             </option>
           ))}
           <option value="QUA_HAN">Quá hạn</option>
         </select>
         <select
           aria-label="Lọc theo ưu tiên"
-          value={boLoc.uuTien ?? ''}
-          onChange={(e) => doiBoLoc({ uuTien: (e.target.value || undefined) as UuTien | undefined })}
+          value={filters.uuTien ?? ''}
+          onChange={(e) => setFilters({ uuTien: (e.target.value || undefined) as Priority | undefined })}
         >
           <option value="">Mọi ưu tiên</option>
-          {UU_TIEN.map((u) => (
+          {PRIORITIES.map((u) => (
             <option key={u} value={u}>
-              {TEN_UU_TIEN[u]}
+              {PRIORITY_LABELS[u]}
             </option>
           ))}
         </select>
-        {coLocPhu && (
-          <button type="button" className="phu" onClick={xoaLoc}>
+        {hasExtraFilters && (
+          <button type="button" className="secondary" onClick={clearFilters}>
             Xóa bộ lọc
           </button>
         )}
       </div>
 
-      {ds.isPending ? (
-        <DangTai />
-      ) : ds.isError ? (
-        <CoLoi loi={ds.error} thuLai={thuLaiTatCa} />
-      ) : ds.data.data.length === 0 ? (
-        <KhongCoDuLieu>
-          {coLocPhu || boLoc.page > 1 ? (
+      {list.isPending ? (
+        <Loading />
+      ) : list.isError ? (
+        <ErrorState error={list.error} onRetry={retryAll} />
+      ) : list.data.data.length === 0 ? (
+        <EmptyState>
+          {hasExtraFilters || filters.page > 1 ? (
             <>
               Không có công việc nào khớp bộ lọc.{' '}
-              <button type="button" className="lien-ket" onClick={xoaLoc}>
+              <button type="button" className="link-button" onClick={clearFilters}>
                 Xóa bộ lọc
               </button>
             </>
           ) : (
             <>
-              Chưa có công việc nào ở mục “{TEN_LOC_NHANH[boLoc.nhanh]}”.{' '}
+              Chưa có công việc nào ở mục “{QUICK_FILTER_LABELS[filters.nhanh]}”.{' '}
               <Link to="/cong-viec/tao">Tạo công việc mới</Link>
             </>
           )}
-        </KhongCoDuLieu>
+        </EmptyState>
       ) : (
         <>
-          <div className={`bang-cuon${ds.isPlaceholderData ? ' dang-lam-moi' : ''}`}>
-            <table className="bang">
+          <div className={`table-scroll${list.isPlaceholderData ? ' refreshing' : ''}`}>
+            <table className="table">
               <thead>
                 <tr>
                   <th>Mã</th>
@@ -178,47 +178,47 @@ export default function DanhSachPage() {
                   <th>Dự án</th>
                   <th>Người thực hiện</th>
                   <th>Ưu tiên</th>
-                  <th aria-sort={boLoc.sapXep === 'hetHan_asc' ? 'ascending' : 'descending'}>
+                  <th aria-sort={filters.sapXep === 'hetHan_asc' ? 'ascending' : 'descending'}>
                     <button
                       type="button"
-                      className="lien-ket"
+                      className="link-button"
                       title="Đổi chiều sắp xếp theo hạn"
-                      onClick={() => doiBoLoc({ sapXep: boLoc.sapXep === 'hetHan_asc' ? 'hetHan_desc' : 'hetHan_asc' })}
+                      onClick={() => setFilters({ sapXep: filters.sapXep === 'hetHan_asc' ? 'hetHan_desc' : 'hetHan_asc' })}
                     >
-                      Hạn {boLoc.sapXep === 'hetHan_asc' ? '▲' : '▼'}
+                      Hạn {filters.sapXep === 'hetHan_asc' ? '▲' : '▼'}
                     </button>
                   </th>
                   <th>Trạng thái</th>
                 </tr>
               </thead>
               <tbody>
-                {ds.data.data.map((cv) => (
-                  <tr key={cv.id} className={cv.quaHan ? 'dong-qua-han' : undefined}>
-                    <td className="ma">
-                      <Link to={`/cong-viec/${cv.id}`}>{cv.ma}</Link>
+                {list.data.data.map((task) => (
+                  <tr key={task.id} className={task.quaHan ? 'overdue-row' : undefined}>
+                    <td className="code">
+                      <Link to={`/cong-viec/${task.id}`}>{task.ma}</Link>
                     </td>
                     <td>
-                      <Link to={`/cong-viec/${cv.id}`}>{cv.ten}</Link>
+                      <Link to={`/cong-viec/${task.id}`}>{task.ten}</Link>
                     </td>
-                    <td>{tra.tenDuAn(cv.duAnId)}</td>
-                    <td>{cv.nguoiThucHienIds.map(tra.tenNguoi).join(', ')}</td>
+                    <td>{lookup.projectName(task.duAnId)}</td>
+                    <td>{task.nguoiThucHienIds.map(lookup.employeeName).join(', ')}</td>
                     <td>
-                      <NhanUuTien uuTien={cv.uuTien} />
+                      <PriorityBadge priority={task.uuTien} />
                     </td>
-                    <td className="ngay">{dinhDangNgay(cv.hetHan)}</td>
+                    <td className="date">{formatDate(task.hetHan)}</td>
                     <td>
-                      <NhanTrangThai trangThai={cv.trangThai} quaHan={cv.quaHan} />
+                      <StatusBadge status={task.trangThai} overdue={task.quaHan} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <PhanTrang
-            page={ds.data.meta.page}
-            limit={ds.data.meta.limit}
-            total={ds.data.meta.total}
-            doiTrang={(page) => doiBoLoc({ page })}
+          <Pagination
+            page={list.data.meta.page}
+            limit={list.data.meta.limit}
+            total={list.data.meta.total}
+            onPageChange={(page) => setFilters({ page })}
           />
         </>
       )}

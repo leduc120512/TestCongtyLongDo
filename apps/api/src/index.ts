@@ -1,32 +1,32 @@
-import { taoApp } from './app.ts'
-import { cauHinh } from './config.ts'
-import { moKetNoi, taoIndex } from './db/connection.ts'
-import { taoKhoMongo } from './repositories/index.ts'
+import { buildApp } from './app.ts'
+import { config } from './config.ts'
+import { connectMongo, createIndexes } from './db/connection.ts'
+import { createMongoStore } from './repositories/index.ts'
 
-const { client, db, coGiaoDich } = await moKetNoi(cauHinh.mongoUrl)
-await taoIndex(db)
+const { client, db, supportsTransactions } = await connectMongo(config.mongoUrl)
+await createIndexes(db)
 
-const app = await taoApp({
-  kho: taoKhoMongo(client, db, coGiaoDich),
-  jwtSecret: cauHinh.jwtSecret,
-  dangNhapGiaLap: !cauHinh.laProduction,
+const app = await buildApp({
+  store: createMongoStore(client, db, supportsTransactions),
+  jwtSecret: config.jwtSecret,
+  mockLogin: !config.isProduction,
   logger: { level: 'info' },
 })
 
-const dong = async () => {
+const shutdown = async () => {
   await app.close()
   await client.close()
   process.exit(0)
 }
-process.on('SIGINT', dong)
-process.on('SIGTERM', dong)
+process.on('SIGINT', shutdown)
+process.on('SIGTERM', shutdown)
 
-if (cauHinh.dungSecretMacDinh) {
+if (config.usingDevSecret) {
   app.log.warn('Đang dùng JWT_SECRET mặc định cho môi trường dev. Đặt JWT_SECRET trong apps/api/.env khi chạy thật.')
 }
-if (!coGiaoDich) {
+if (!supportsTransactions) {
   app.log.warn(
     'MongoDB không chạy replica set: không dùng được transaction, ghi công việc và lịch sử sẽ không nguyên tử. Dùng docker compose của repo.',
   )
 }
-await app.listen({ port: cauHinh.port, host: cauHinh.host })
+await app.listen({ port: config.port, host: config.host })

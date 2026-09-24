@@ -1,14 +1,14 @@
-import { TEN_TRANG_THAI, TEN_UU_TIEN, type TrangThai, type UuTien } from '@longdo/contracts'
+import { STATUS_LABELS, PRIORITY_LABELS, type TaskStatus, type Priority } from '@longdo/contracts'
 
-export function NhanTrangThai({ trangThai, quaHan }: { trangThai: TrangThai; quaHan?: boolean }) {
+export function StatusBadge({ status, overdue }: { status: TaskStatus; overdue?: boolean }) {
   return (
-    <span className="nhom-nhan">
-      <span className={`nhan tt-${trangThai}`}>{TEN_TRANG_THAI[trangThai]}</span>
-      {quaHan && <span className="nhan qua-han">Quá hạn</span>}
+    <span className="badge-group">
+      <span className={`badge status-${status}`}>{STATUS_LABELS[status]}</span>
+      {overdue && <span className="badge overdue">Quá hạn</span>}
     </span>
   )
 }
 
-export function NhanUuTien({ uuTien }: { uuTien: UuTien }) {
-  return <span className={`nhan ut-${uuTien}`}>{TEN_UU_TIEN[uuTien]}</span>
+export function PriorityBadge({ priority }: { priority: Priority }) {
+  return <span className={`badge priority-${priority}`}>{PRIORITY_LABELS[priority]}</span>
 }

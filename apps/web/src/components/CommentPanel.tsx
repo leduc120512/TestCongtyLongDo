@@ -1,77 +1,77 @@
-import { VietBinhLuanSchema } from '@longdo/contracts'
+import { AddCommentSchema } from '@longdo/contracts'
 import { useState, type FormEvent } from 'react'
-import { useBinhLuan, useVietBinhLuan } from '../hooks/useTasks'
-import { useTraCuu } from '../hooks/useCatalog'
-import { dinhDangLuc } from './format'
-import { CoLoi, DangTai, KhongCoDuLieu } from './LoadingState'
+import { useComments, useAddComment } from '../hooks/useTasks'
+import { useLookup } from '../hooks/useCatalog'
+import { formatDateTime } from './format'
+import { ErrorState, Loading, EmptyState } from './LoadingState'
 
 /** Bình luận: ai liên quan tới công việc (giao, thực hiện, theo dõi) đều đọc và viết được. */
-export function BinhLuanPanel({ congViecId }: { congViecId: string }) {
-  const ds = useBinhLuan(congViecId)
-  const viet = useVietBinhLuan(congViecId)
-  const tra = useTraCuu()
-  const [noiDung, setNoiDung] = useState('')
-  const [loiNhap, setLoiNhap] = useState<string>()
+export function CommentPanel({ taskId }: { taskId: string }) {
+  const comments = useComments(taskId)
+  const addComment = useAddComment(taskId)
+  const lookup = useLookup()
+  const [content, setContent] = useState('')
+  const [inputError, setInputError] = useState<string>()
 
-  const gui = (e: FormEvent) => {
+  const submit = (e: FormEvent) => {
     e.preventDefault()
-    const kq = VietBinhLuanSchema.safeParse({ noiDung })
-    if (!kq.success) {
-      setLoiNhap(kq.error.issues[0]?.message)
+    const result = AddCommentSchema.safeParse({ noiDung: content })
+    if (!result.success) {
+      setInputError(result.error.issues[0]?.message)
       return
     }
-    setLoiNhap(undefined)
-    const daGui = kq.data.noiDung
+    setInputError(undefined)
+    const sent = result.data.noiDung
     // Chỉ xóa ô nếu người dùng chưa gõ thêm gì trong lúc chờ gửi.
-    viet.mutate(daGui, { onSuccess: () => setNoiDung((cu) => (cu.trim() === daGui ? '' : cu)) })
+    addComment.mutate(sent, { onSuccess: () => setContent((prev) => (prev.trim() === sent ? '' : prev)) })
   }
 
   return (
-    <section className="khoi">
+    <section className="panel">
       <h2>Bình luận</h2>
-      {ds.isPending ? (
-        <DangTai noiDung="Đang tải bình luận…" />
-      ) : ds.isError ? (
-        <CoLoi loi={ds.error} thuLai={() => ds.refetch()} />
-      ) : ds.data.length === 0 ? (
-        <KhongCoDuLieu>Chưa có bình luận nào.</KhongCoDuLieu>
+      {comments.isPending ? (
+        <Loading label="Đang tải bình luận…" />
+      ) : comments.isError ? (
+        <ErrorState error={comments.error} onRetry={() => comments.refetch()} />
+      ) : comments.data.length === 0 ? (
+        <EmptyState>Chưa có bình luận nào.</EmptyState>
       ) : (
-        <ol className="binh-luan">
-          {ds.data.map((b) => (
-            <li key={b.id}>
-              <div className="lich-su-dau">
-                <strong>{tra.tenNguoi(b.nguoiVietId)}</strong>
-                <time dateTime={b.taoLuc} className="nho">
-                  {dinhDangLuc(b.taoLuc)}
+        <ol className="comments">
+          {comments.data.map((comment) => (
+            <li key={comment.id}>
+              <div className="entry-header">
+                <strong>{lookup.employeeName(comment.nguoiVietId)}</strong>
+                <time dateTime={comment.taoLuc} className="muted">
+                  {formatDateTime(comment.taoLuc)}
                 </time>
               </div>
-              <p className="mo-ta-bl">{b.noiDung}</p>
+              <p className="comment-body">{comment.noiDung}</p>
             </li>
           ))}
         </ol>
       )}
 
-      <form className="viet-bl" onSubmit={gui}>
-        <label htmlFor="noiDungBl" className="an">
+      <form className="comment-form" onSubmit={submit}>
+        <label htmlFor="comment-content" className="sr-only">
           Viết bình luận
         </label>
         <textarea
-          id="noiDungBl"
+          id="comment-content"
           rows={2}
           maxLength={2000}
           placeholder="Viết bình luận…"
-          value={noiDung}
-          onChange={(e) => setNoiDung(e.target.value)}
-          aria-invalid={!!loiNhap}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          aria-invalid={!!inputError}
         />
-        <button type="submit" disabled={viet.isPending}>
-          {viet.isPending ? 'Đang gửi…' : 'Gửi'}
+        <button type="submit" disabled={addComment.isPending}>
+          {addComment.isPending ? 'Đang gửi…' : 'Gửi'}
         </button>
       </form>
-      {loiNhap && <p className="loi-nho">{loiNhap}</p>}
-      {viet.error && (
-        <p className="loi-khoi" role="alert">
-          {viet.error.message}
+      {inputError && <p className="field-error">{inputError}</p>}
+      {addComment.error && (
+        <p className="error-block" role="alert">
+          {addComment.error.message}
         </p>
       )}
     </section>

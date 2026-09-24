@@ -1,25 +1,25 @@
-import type { HanhDongLichSu, ThayDoiTruong } from '@longdo/contracts'
+import type { HistoryAction, FieldChange } from '@longdo/contracts'
 import { ObjectId, type ClientSession, type Collection, type Db } from 'mongodb'
-import { boUndefined } from '../db/strip-undefined.ts'
-import { TEN_BANG } from '../db/connection.ts'
-import { sangObjectId } from '../db/object-id.ts'
-import type { LichSuBanGhi, LichSuMoi } from '../types.ts'
-import type { LichSuRepository } from './interfaces.ts'
+import { stripUndefined } from '../db/strip-undefined.ts'
+import { COLLECTIONS } from '../db/connection.ts'
+import { toObjectId } from '../db/object-id.ts'
+import type { HistoryRecord, NewHistoryRecord } from '../types.ts'
+import type { HistoryRepository } from './interfaces.ts'
 
-type LichSuDoc = {
+type HistoryDoc = {
   _id: ObjectId
   congTyId: ObjectId
   congViecId: ObjectId
   nguoiDoiId: ObjectId
   luc: Date
-  hanhDong: HanhDongLichSu
+  hanhDong: HistoryAction
   /** Mỗi lần lưu là một bản ghi; các trường đổi trong lần đó nằm chung trong mảng này. */
-  thayDoi: ThayDoiTruong[]
+  thayDoi: FieldChange[]
   lyDo?: string
 }
 
-function sangBanGhi(d: LichSuDoc): LichSuBanGhi {
-  return boUndefined({
+function toRecord(d: HistoryDoc): HistoryRecord {
+  return stripUndefined({
     id: d._id.toHexString(),
     congTyId: d.congTyId.toHexString(),
     congViecId: d.congViecId.toHexString(),
@@ -31,43 +31,43 @@ function sangBanGhi(d: LichSuDoc): LichSuBanGhi {
   })
 }
 
-export class MongoLichSuRepository implements LichSuRepository {
-  private readonly col: Collection<LichSuDoc>
+export class MongoHistoryRepository implements HistoryRepository {
+  private readonly col: Collection<HistoryDoc>
   private readonly session: ClientSession | undefined
 
   constructor(db: Db, session?: ClientSession) {
-    this.col = db.collection<LichSuDoc>(TEN_BANG.lichSu)
+    this.col = db.collection<HistoryDoc>(COLLECTIONS.history)
     this.session = session
   }
 
-  async ghi(banGhi: LichSuMoi): Promise<void> {
-    const congTyId = sangObjectId(banGhi.congTyId)
-    const congViecId = sangObjectId(banGhi.congViecId)
-    const nguoiDoiId = sangObjectId(banGhi.nguoiDoiId)
+  async add(record: NewHistoryRecord): Promise<void> {
+    const congTyId = toObjectId(record.congTyId)
+    const congViecId = toObjectId(record.congViecId)
+    const nguoiDoiId = toObjectId(record.nguoiDoiId)
     if (!congTyId || !congViecId || !nguoiDoiId) throw new Error('Id lịch sử không hợp lệ')
     await this.col.insertOne(
-      boUndefined({
+      stripUndefined({
         _id: new ObjectId(),
         congTyId,
         congViecId,
         nguoiDoiId,
-        luc: banGhi.luc,
-        hanhDong: banGhi.hanhDong,
-        thayDoi: banGhi.thayDoi,
-        lyDo: banGhi.lyDo,
+        luc: record.luc,
+        hanhDong: record.hanhDong,
+        thayDoi: record.thayDoi,
+        lyDo: record.lyDo,
       }),
       { session: this.session },
     )
   }
 
-  async danhSach(congTyId: string, congViecId: string): Promise<LichSuBanGhi[]> {
-    const ct = sangObjectId(congTyId)
-    const cv = sangObjectId(congViecId)
-    if (!ct || !cv) return []
+  async list(congTyId: string, congViecId: string): Promise<HistoryRecord[]> {
+    const companyOid = toObjectId(congTyId)
+    const taskOid = toObjectId(congViecId)
+    if (!companyOid || !taskOid) return []
     const docs = await this.col
-      .find({ congTyId: ct, congViecId: cv }, { session: this.session })
+      .find({ congTyId: companyOid, congViecId: taskOid }, { session: this.session })
       .sort({ luc: -1, _id: -1 })
       .toArray()
-    return docs.map(sangBanGhi)
+    return docs.map(toRecord)
   }
 }

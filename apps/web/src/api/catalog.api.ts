@@ -1,13 +1,13 @@
-import type { DuAn, KetQuaDangNhap, NhanVien, PhanHoi } from '@longdo/contracts'
-import { goiApi } from './http'
+import type { Project, LoginResult, Employee, ApiResponse } from '@longdo/contracts'
+import { callApi } from './http'
 
-export const danhMucApi = {
-  nhanVien: async () => (await goiApi<PhanHoi<NhanVien[]>>('/nhan-vien')).data,
-  duAn: async () => (await goiApi<PhanHoi<DuAn[]>>('/du-an')).data,
+export const catalogApi = {
+  employees: async () => (await callApi<ApiResponse<Employee[]>>('/nhan-vien')).data,
+  projects: async () => (await callApi<ApiResponse<Project[]>>('/du-an')).data,
 }
 
-export const xacThucApi = {
-  nguoiDungGiaLap: async () => (await goiApi<PhanHoi<NhanVien[]>>('/xac-thuc/nguoi-dung-gia-lap')).data,
-  dangNhapGiaLap: async (userId: string) =>
-    (await goiApi<PhanHoi<KetQuaDangNhap>>('/xac-thuc/dang-nhap-gia-lap', { method: 'POST', body: { userId } })).data,
+export const authApi = {
+  mockUsers: async () => (await callApi<ApiResponse<Employee[]>>('/xac-thuc/nguoi-dung-gia-lap')).data,
+  mockLogin: async (userId: string) =>
+    (await callApi<ApiResponse<LoginResult>>('/xac-thuc/dang-nhap-gia-lap', { method: 'POST', body: { userId } })).data,
 }

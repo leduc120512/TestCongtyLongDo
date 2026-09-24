@@ -2,7 +2,7 @@
 
 Công cụ: Claude Code (desktop). Dưới đây là 6 lần làm việc đáng kể nhất, theo thứ tự thời gian. Lần 3, 4 và 6 là những lần **AI làm sai** và bị phát hiện.
 
-> Sau các lần dưới đây, tên thư mục và tên file đã đổi sang tiếng Anh (vd. `services/nghiep-vu/` → `services/domain/`, `kiem-thu-hook.mjs` → `test-hooks.mjs`). Đường dẫn trong nhật ký đã cập nhật theo tên mới.
+> Sau các lần dưới đây, tên thư mục, tên file và tên trong code đã đổi sang tiếng Anh; hợp đồng dữ liệu (tên trường, enum, URL API) giữ nguyên. Đường dẫn trong nhật ký đã cập nhật theo tên mới. Tên hàm, kiểu giữ như lúc làm; tên hiện tại: `xetChuyenTrangThai` → `checkStatusTransition`, `tinhQuyen` → `getPermissions`, `homNayVN` → `todayInVietnam`, `TaoCongViecSchema`/`SuaCongViecSchema` → `CreateTaskSchema`/`UpdateTaskSchema`, `TruongNhapGoc` → `BaseTaskFields`, `kho.giaoDich` → `store.transaction`, `ghiCoKhoa` → `writeWithLock`.
 
 ---
 

@@ -1,100 +1,100 @@
-import { TEN_TRANG_THAI, type MaLoi, type TrangThai } from '@longdo/contracts'
-import { xacDinhVaiTro, type VaiTro } from './permissions.ts'
-import { soViecConChuaXong, tinhTienDo } from './subtasks.ts'
+import { STATUS_LABELS, type ErrorCode, type TaskStatus } from '@longdo/contracts'
+import { getRoles, type Roles } from './permissions.ts'
+import { countUnfinished, computeProgress } from './subtasks.ts'
 
-type CongViecToiThieu = {
+type TaskLike = {
   nguoiGiaoId: string
   nguoiThucHienIds: string[]
   nguoiTheoDoiIds: string[]
-  trangThai: TrangThai
+  trangThai: TaskStatus
   tienDo: number
   viecCon?: ReadonlyArray<{ xong: boolean }>
 }
 
-type BuocChuyen = {
-  tu: TrangThai
-  den: TrangThai
-  duocPhep: (vt: VaiTro) => boolean
-  loiQuyen: string
-  canLyDo?: boolean
+type Transition = {
+  from: TaskStatus
+  to: TaskStatus
+  allowed: (roles: Roles) => boolean
+  deniedMessage: string
+  requiresReason?: boolean
 }
 
 /**
  * Luồng: CHUA_BAT_DAU → DANG_LAM → CHO_DUYET → HOAN_THANH, và CHO_DUYET → DANG_LAM (trả lại, kèm lý do).
  * HOAN_THANH là trạng thái cuối. Người giao đồng thời là người thực hiện vẫn tự duyệt được.
  */
-export const BUOC_CHUYEN: readonly BuocChuyen[] = [
+export const TRANSITIONS: readonly Transition[] = [
   {
-    tu: 'CHUA_BAT_DAU',
-    den: 'DANG_LAM',
-    duocPhep: (vt) => vt.laNguoiThucHien,
-    loiQuyen: 'Chỉ người thực hiện mới được bắt đầu công việc',
+    from: 'CHUA_BAT_DAU',
+    to: 'DANG_LAM',
+    allowed: (roles) => roles.isAssignee,
+    deniedMessage: 'Chỉ người thực hiện mới được bắt đầu công việc',
   },
   {
-    tu: 'DANG_LAM',
-    den: 'CHO_DUYET',
-    duocPhep: (vt) => vt.laNguoiThucHien,
-    loiQuyen: 'Chỉ người thực hiện mới được gửi duyệt',
+    from: 'DANG_LAM',
+    to: 'CHO_DUYET',
+    allowed: (roles) => roles.isAssignee,
+    deniedMessage: 'Chỉ người thực hiện mới được gửi duyệt',
   },
   {
-    tu: 'CHO_DUYET',
-    den: 'HOAN_THANH',
-    duocPhep: (vt) => vt.laNguoiGiao,
-    loiQuyen: 'Chỉ người giao việc mới được duyệt',
+    from: 'CHO_DUYET',
+    to: 'HOAN_THANH',
+    allowed: (roles) => roles.isAssigner,
+    deniedMessage: 'Chỉ người giao việc mới được duyệt',
   },
   {
-    tu: 'CHO_DUYET',
-    den: 'DANG_LAM',
-    duocPhep: (vt) => vt.laNguoiGiao,
-    loiQuyen: 'Chỉ người giao việc mới được trả lại',
-    canLyDo: true,
+    from: 'CHO_DUYET',
+    to: 'DANG_LAM',
+    allowed: (roles) => roles.isAssigner,
+    deniedMessage: 'Chỉ người giao việc mới được trả lại',
+    requiresReason: true,
   },
 ]
 
-export type KetQuaChuyen =
-  | { ok: true; capNhat: { trangThai: TrangThai; tienDo?: number } }
-  | { ok: false; code: MaLoi; message: string }
+export type TransitionResult =
+  | { ok: true; update: { trangThai: TaskStatus; tienDo?: number } }
+  | { ok: false; code: ErrorCode; message: string }
 
 /** Hàm thuần: quyết định một lần chuyển trạng thái có hợp lệ không và cần cập nhật gì. */
-export function xetChuyenTrangThai(
-  cv: CongViecToiThieu,
+export function checkStatusTransition(
+  task: TaskLike,
   userId: string,
-  den: TrangThai,
+  target: TaskStatus,
   lyDo?: string | null,
-): KetQuaChuyen {
-  if (cv.trangThai === 'HOAN_THANH') {
+): TransitionResult {
+  if (task.trangThai === 'HOAN_THANH') {
     return { ok: false, code: 'TRANG_THAI_KHONG_HOP_LE', message: 'Công việc đã hoàn thành, không thay đổi được nữa' }
   }
-  const buoc = BUOC_CHUYEN.find((b) => b.tu === cv.trangThai && b.den === den)
-  if (!buoc) {
+  const transition = TRANSITIONS.find((b) => b.from === task.trangThai && b.to === target)
+  if (!transition) {
     return {
       ok: false,
       code: 'TRANG_THAI_KHONG_HOP_LE',
-      message: `Không thể chuyển từ "${TEN_TRANG_THAI[cv.trangThai]}" sang "${TEN_TRANG_THAI[den]}"`,
+      message: `Không thể chuyển từ "${STATUS_LABELS[task.trangThai]}" sang "${STATUS_LABELS[target]}"`,
     }
   }
-  const vt = xacDinhVaiTro(cv, userId)
-  if (!buoc.duocPhep(vt)) {
-    return { ok: false, code: 'KHONG_CO_QUYEN', message: buoc.loiQuyen }
+  const roles = getRoles(task, userId)
+  if (!transition.allowed(roles)) {
+    return { ok: false, code: 'KHONG_CO_QUYEN', message: transition.deniedMessage }
   }
-  if (buoc.canLyDo && !lyDo?.trim()) {
+  if (transition.requiresReason && !lyDo?.trim()) {
     return { ok: false, code: 'VALIDATION', message: 'Trả lại công việc phải ghi lý do' }
   }
-  const viecCon = cv.viecCon ?? []
-  const conLai = soViecConChuaXong(viecCon)
-  if (den === 'CHO_DUYET' && conLai > 0) {
+  const subtasks = task.viecCon ?? []
+  const remaining = countUnfinished(subtasks)
+  if (target === 'CHO_DUYET' && remaining > 0) {
     return {
       ok: false,
       code: 'TRANG_THAI_KHONG_HOP_LE',
-      message: `Còn ${conLai} việc con chưa xong, chưa gửi duyệt được`,
+      message: `Còn ${remaining} việc con chưa xong, chưa gửi duyệt được`,
     }
   }
-  const capNhat: { trangThai: TrangThai; tienDo?: number } = { trangThai: den }
-  if (den === 'CHO_DUYET') capNhat.tienDo = 100
+  const update: { trangThai: TaskStatus; tienDo?: number } = { trangThai: target }
+  if (target === 'CHO_DUYET') update.tienDo = 100
   else {
     // Trả lại / bắt đầu: nếu có việc con thì tiến độ tính lại theo việc con.
-    const tienDoMoi = tinhTienDo(viecCon, den, cv.tienDo)
-    if (tienDoMoi !== cv.tienDo) capNhat.tienDo = tienDoMoi
+    const newProgress = computeProgress(subtasks, target, task.tienDo)
+    if (newProgress !== task.tienDo) update.tienDo = newProgress
   }
-  return { ok: true, capNhat }
+  return { ok: true, update }
 }

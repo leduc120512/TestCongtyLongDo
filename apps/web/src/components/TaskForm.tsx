@@ -1,23 +1,23 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { TaoCongViecSchema, TEN_UU_TIEN, UU_TIEN, type TaoCongViec, type UuTien } from '@longdo/contracts'
+import { CreateTaskSchema, PRIORITY_LABELS, PRIORITIES, type CreateTask, type Priority } from '@longdo/contracts'
 import { Controller, useForm, type Resolver } from 'react-hook-form'
-import { useDuAn, useNhanVien } from '../hooks/useCatalog'
-import { ChonNhieuNguoi } from './MultiPersonPicker'
-import { CoLoi, DangTai } from './LoadingState'
+import { useProjects, useEmployees } from '../hooks/useCatalog'
+import { MultiPersonPicker } from './MultiPersonPicker'
+import { ErrorState, Loading } from './LoadingState'
 
 /** Giá trị trên form: ô trống là chuỗi rỗng như input HTML trả về. */
-export type GiaTriForm = {
+export type TaskFormValues = {
   ten: string
   moTa: string
   duAnId: string
   nguoiThucHienIds: string[]
   nguoiTheoDoiIds: string[]
-  uuTien: UuTien
+  uuTien: Priority
   batDau: string
   hetHan: string
 }
 
-export const FORM_TRONG: GiaTriForm = {
+export const EMPTY_FORM: TaskFormValues = {
   ten: '',
   moTa: '',
   duAnId: '',
@@ -29,12 +29,12 @@ export const FORM_TRONG: GiaTriForm = {
 }
 
 /**
- * Validate bằng đúng TaoCongViecSchema của contracts (cùng schema API dùng), chỉ đổi ô trống thành null
+ * Validate bằng đúng CreateTaskSchema của contracts (cùng schema API dùng), chỉ đổi ô trống thành null
  * trước khi đưa vào schema. Nhờ vậy lỗi trên web và lỗi từ API luôn giống nhau.
  */
-const zod = zodResolver(TaoCongViecSchema)
-const resolver: Resolver<GiaTriForm, unknown, TaoCongViec> = (values, ctx, opts) =>
-  zod(
+const baseResolver = zodResolver(CreateTaskSchema)
+const resolver: Resolver<TaskFormValues, unknown, CreateTask> = (values, ctx, opts) =>
+  baseResolver(
     {
       ...values,
       moTa: values.moTa || null,
@@ -46,23 +46,23 @@ const resolver: Resolver<GiaTriForm, unknown, TaoCongViec> = (values, ctx, opts)
     opts as never,
   ) as never
 
-export function FormCongViec({
-  giaTriDau,
-  nutLuu,
-  dangGui,
-  loiMayChu,
-  onGui,
-  onHuy,
+export function TaskForm({
+  initialValues,
+  submitLabel,
+  submitting,
+  serverError,
+  onSubmit,
+  onCancel,
 }: {
-  giaTriDau: GiaTriForm
-  nutLuu: string
-  dangGui: boolean
-  loiMayChu?: string
-  onGui: (duLieu: TaoCongViec) => void
-  onHuy: () => void
+  initialValues: TaskFormValues
+  submitLabel: string
+  submitting: boolean
+  serverError?: string
+  onSubmit: (data: CreateTask) => void
+  onCancel: () => void
 }) {
-  const nhanVien = useNhanVien()
-  const duAn = useDuAn()
+  const employees = useEmployees()
+  const projects = useProjects()
   const {
     register,
     control,
@@ -70,86 +70,86 @@ export function FormCongViec({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<GiaTriForm, unknown, TaoCongViec>({ defaultValues: giaTriDau, resolver })
+  } = useForm<TaskFormValues, unknown, CreateTask>({ defaultValues: initialValues, resolver })
 
-  if (nhanVien.isPending || duAn.isPending) return <DangTai />
-  if (nhanVien.isError) return <CoLoi loi={nhanVien.error} thuLai={() => nhanVien.refetch()} />
-  if (duAn.isError) return <CoLoi loi={duAn.error} thuLai={() => duAn.refetch()} />
+  if (employees.isPending || projects.isPending) return <Loading />
+  if (employees.isError) return <ErrorState error={employees.error} onRetry={() => employees.refetch()} />
+  if (projects.isError) return <ErrorState error={projects.error} onRetry={() => projects.refetch()} />
 
-  const thucHien = watch('nguoiThucHienIds')
-  const batDau = watch('batDau')
+  const assigneeIds = watch('nguoiThucHienIds')
+  const startDate = watch('batDau')
 
   return (
-    <form className="form" onSubmit={handleSubmit(onGui)} noValidate>
-      <div className="truong">
+    <form className="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <div className="field">
         <label htmlFor="ten">Tên công việc *</label>
         <input id="ten" {...register('ten')} aria-invalid={!!errors.ten} autoFocus />
-        {errors.ten && <p className="loi-nho">{errors.ten.message}</p>}
+        {errors.ten && <p className="field-error">{errors.ten.message}</p>}
       </div>
 
-      <div className="truong">
+      <div className="field">
         <label htmlFor="moTa">Mô tả</label>
         <textarea id="moTa" rows={3} {...register('moTa')} aria-invalid={!!errors.moTa} />
-        {errors.moTa && <p className="loi-nho">{errors.moTa.message}</p>}
+        {errors.moTa && <p className="field-error">{errors.moTa.message}</p>}
       </div>
 
-      <div className="hang">
-        <div className="truong">
+      <div className="row">
+        <div className="field">
           <label htmlFor="duAnId">Dự án</label>
           <select id="duAnId" {...register('duAnId')}>
             <option value="">Việc chung (không thuộc dự án)</option>
-            {duAn.data.map((d) => (
+            {projects.data.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.ma} · {d.ten}
               </option>
             ))}
           </select>
-          {errors.duAnId && <p className="loi-nho">{errors.duAnId.message}</p>}
+          {errors.duAnId && <p className="field-error">{errors.duAnId.message}</p>}
         </div>
-        <div className="truong">
+        <div className="field">
           <label htmlFor="uuTien">Ưu tiên</label>
           <select id="uuTien" {...register('uuTien')}>
-            {UU_TIEN.map((u) => (
+            {PRIORITIES.map((u) => (
               <option key={u} value={u}>
-                {TEN_UU_TIEN[u]}
+                {PRIORITY_LABELS[u]}
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      <div className="hang">
-        <div className="truong">
+      <div className="row">
+        <div className="field">
           <label htmlFor="batDau">Bắt đầu</label>
           <input id="batDau" type="date" {...register('batDau', { deps: ['hetHan'] })} aria-invalid={!!errors.batDau} />
-          {errors.batDau && <p className="loi-nho">{errors.batDau.message}</p>}
+          {errors.batDau && <p className="field-error">{errors.batDau.message}</p>}
         </div>
-        <div className="truong">
+        <div className="field">
           <label htmlFor="hetHan">Hạn</label>
           <input
             id="hetHan"
             type="date"
-            min={batDau || undefined}
+            min={startDate || undefined}
             {...register('hetHan')}
             aria-invalid={!!errors.hetHan}
           />
-          {errors.hetHan && <p className="loi-nho">{errors.hetHan.message}</p>}
+          {errors.hetHan && <p className="field-error">{errors.hetHan.message}</p>}
         </div>
       </div>
 
-      <div className="truong">
-        <span className="nhan-truong" id="nguoiThucHienIds-nhan">
+      <div className="field">
+        <span className="field-label" id="nguoiThucHienIds-label">
           Người thực hiện * (ít nhất 1 người)
         </span>
         <Controller
           control={control}
           name="nguoiThucHienIds"
           render={({ field }) => (
-            <ChonNhieuNguoi
+            <MultiPersonPicker
               id="nguoiThucHienIds"
-              nhanVien={nhanVien.data}
-              giaTri={field.value}
-              coLoi={!!errors.nguoiThucHienIds}
+              employees={employees.data}
+              value={field.value}
+              invalid={!!errors.nguoiThucHienIds}
               onChange={(ids) => {
                 field.onChange(ids)
                 // Đã thực hiện thì không cần nằm trong danh sách theo dõi.
@@ -161,39 +161,39 @@ export function FormCongViec({
             />
           )}
         />
-        {errors.nguoiThucHienIds && <p className="loi-nho">{errors.nguoiThucHienIds.message}</p>}
+        {errors.nguoiThucHienIds && <p className="field-error">{errors.nguoiThucHienIds.message}</p>}
       </div>
 
-      <div className="truong">
-        <span className="nhan-truong" id="nguoiTheoDoiIds-nhan">
+      <div className="field">
+        <span className="field-label" id="nguoiTheoDoiIds-label">
           Người theo dõi
         </span>
         <Controller
           control={control}
           name="nguoiTheoDoiIds"
           render={({ field }) => (
-            <ChonNhieuNguoi
+            <MultiPersonPicker
               id="nguoiTheoDoiIds"
-              nhanVien={nhanVien.data}
-              giaTri={field.value}
-              loaiTru={thucHien}
+              employees={employees.data}
+              value={field.value}
+              excluded={assigneeIds}
               onChange={field.onChange}
             />
           )}
         />
       </div>
 
-      {loiMayChu && (
-        <p className="loi-khoi" role="alert">
-          {loiMayChu}
+      {serverError && (
+        <p className="error-block" role="alert">
+          {serverError}
         </p>
       )}
 
-      <div className="nut-hang">
-        <button type="submit" disabled={dangGui}>
-          {dangGui ? 'Đang lưu…' : nutLuu}
+      <div className="button-row">
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Đang lưu…' : submitLabel}
         </button>
-        <button type="button" className="phu" onClick={onHuy} disabled={dangGui}>
+        <button type="button" className="secondary" onClick={onCancel} disabled={submitting}>
           Hủy
         </button>
       </div>

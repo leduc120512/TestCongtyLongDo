@@ -1,70 +1,70 @@
-import type { DuAn, NhanVien } from '@longdo/contracts'
+import type { Project, Employee } from '@longdo/contracts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { danhMucApi, xacThucApi } from '../api/catalog.api'
-import { datPhien, usePhien } from '../auth/session'
+import { catalogApi, authApi } from '../api/catalog.api'
+import { setSession, useSession } from '../auth/session'
 
 // Danh mục ít đổi: giữ lâu trong cache.
-const LAU = 5 * 60_000
+const CATALOG_STALE_TIME = 5 * 60_000
 
-export function useNhanVien() {
-  const phien = usePhien()
+export function useEmployees() {
+  const session = useSession()
   return useQuery({
-    queryKey: ['nhan-vien', phien?.nhanVien.congTyId],
-    queryFn: danhMucApi.nhanVien,
-    enabled: !!phien,
-    staleTime: LAU,
+    queryKey: ['employees', session?.nhanVien.congTyId],
+    queryFn: catalogApi.employees,
+    enabled: !!session,
+    staleTime: CATALOG_STALE_TIME,
   })
 }
 
-export function useDuAn() {
-  const phien = usePhien()
+export function useProjects() {
+  const session = useSession()
   return useQuery({
-    queryKey: ['du-an', phien?.nhanVien.congTyId],
-    queryFn: danhMucApi.duAn,
-    enabled: !!phien,
-    staleTime: LAU,
+    queryKey: ['projects', session?.nhanVien.congTyId],
+    queryFn: catalogApi.projects,
+    enabled: !!session,
+    staleTime: CATALOG_STALE_TIME,
   })
 }
 
 /** Tra tên theo id, dùng khi hiển thị danh sách người, dự án, lịch sử. */
-export function useTraCuu() {
-  const nhanVienQ = useNhanVien()
-  const duAnQ = useDuAn()
-  const nhanVien = nhanVienQ.data
-  const duAn = duAnQ.data
-  const loi = nhanVienQ.error ?? duAnQ.error
-  const { refetch: taiLaiNv } = nhanVienQ
-  const { refetch: taiLaiDa } = duAnQ
+export function useLookup() {
+  const employeesQuery = useEmployees()
+  const projectsQuery = useProjects()
+  const employees = employeesQuery.data
+  const projects = projectsQuery.data
+  const error = employeesQuery.error ?? projectsQuery.error
+  const { refetch: refetchEmployees } = employeesQuery
+  const { refetch: refetchProjects } = projectsQuery
   return useMemo(() => {
-    const nv = new Map<string, NhanVien>((nhanVien ?? []).map((x) => [x.id, x]))
-    const da = new Map<string, DuAn>((duAn ?? []).map((x) => [x.id, x]))
-    const dangTai = !nhanVien || !duAn
+    const employeeById = new Map<string, Employee>((employees ?? []).map((x) => [x.id, x]))
+    const projectById = new Map<string, Project>((projects ?? []).map((x) => [x.id, x]))
+    const loading = !employees || !projects
     return {
-      tenNguoi: (id: string) => nv.get(id)?.ten ?? (dangTai ? '…' : '(không rõ)'),
-      tenDuAn: (id?: string | null) => (id ? (da.get(id)?.ten ?? (dangTai ? '…' : '(không rõ)')) : 'Việc chung'),
+      employeeName: (id: string) => employeeById.get(id)?.ten ?? (loading ? '…' : '(không rõ)'),
+      projectName: (id?: string | null) => (id ? (projectById.get(id)?.ten ?? (loading ? '…' : '(không rõ)')) : 'Việc chung'),
       /** Lỗi tải danh mục nhân viên/dự án (null nếu không lỗi). */
-      loi,
-      thuLai: () => {
-        void taiLaiNv()
-        void taiLaiDa()
+      error,
+      retry: () => {
+        void refetchEmployees()
+        void refetchProjects()
       },
     }
-  }, [nhanVien, duAn, loi, taiLaiNv, taiLaiDa])
+  }, [employees, projects, error, refetchEmployees, refetchProjects])
 }
 
-export function useNguoiDungGiaLap() {
-  return useQuery({ queryKey: ['nguoi-dung-gia-lap'], queryFn: xacThucApi.nguoiDungGiaLap, staleTime: LAU })
+export function useMockUsers() {
+  return useQuery({ queryKey: ['mock-users'], queryFn: authApi.mockUsers, staleTime: CATALOG_STALE_TIME })
 }
 
 /** Đổi người đang đăng nhập: lấy token mới, xóa sạch cache của người trước. */
-export function useDangNhapGiaLap() {
+export function useMockLogin() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: xacThucApi.dangNhapGiaLap,
-    onSuccess: (kq) => {
-      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'nguoi-dung-gia-lap' })
-      datPhien({ token: kq.token, nhanVien: kq.nhanVien })
+    mutationFn: authApi.mockLogin,
+    onSuccess: (result) => {
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'mock-users' })
+      setSession({ token: result.token, nhanVien: result.nhanVien })
     },
   })
 }

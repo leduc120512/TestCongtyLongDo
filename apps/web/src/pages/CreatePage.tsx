@@ -1,21 +1,21 @@
 import { useNavigate } from 'react-router'
-import { FORM_TRONG, FormCongViec } from '../components/TaskForm'
-import { useTaoCongViec } from '../hooks/useTasks'
+import { EMPTY_FORM, TaskForm } from '../components/TaskForm'
+import { useCreateTask } from '../hooks/useTasks'
 
-export default function TaoPage() {
+export default function CreatePage() {
   const navigate = useNavigate()
-  const tao = useTaoCongViec()
+  const createTask = useCreateTask()
 
   return (
-    <section className="hep">
+    <section className="narrow">
       <h1>Tạo công việc</h1>
-      <FormCongViec
-        giaTriDau={FORM_TRONG}
-        nutLuu="Tạo công việc"
-        dangGui={tao.isPending}
-        loiMayChu={tao.error?.message}
-        onGui={(duLieu) => tao.mutate(duLieu, { onSuccess: (cv) => navigate(`/cong-viec/${cv.id}`) })}
-        onHuy={() => navigate('/cong-viec')}
+      <TaskForm
+        initialValues={EMPTY_FORM}
+        submitLabel="Tạo công việc"
+        submitting={createTask.isPending}
+        serverError={createTask.error?.message}
+        onSubmit={(data) => createTask.mutate(data, { onSuccess: (task) => navigate(`/cong-viec/${task.id}`) })}
+        onCancel={() => navigate('/cong-viec')}
       />
     </section>
   )

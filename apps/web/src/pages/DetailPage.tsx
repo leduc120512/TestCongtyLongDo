@@ -1,73 +1,73 @@
-import type { ChiTietCongViec } from '@longdo/contracts'
+import type { TaskDetail } from '@longdo/contracts'
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { LoiApi } from '../api/http'
-import { dinhDangLuc, dinhDangNgay } from '../components/format'
-import { BinhLuanPanel } from '../components/CommentPanel'
-import { LichSuThayDoi } from '../components/ChangeHistory'
-import { NhanTrangThai, NhanUuTien } from '../components/Badges'
-import { CoLoi, DangTai, KhongCoDuLieu } from '../components/LoadingState'
-import { ViecConPanel } from '../components/SubtaskPanel'
-import { useCapNhatTienDo, useChiTietCongViec, useChuyenTrangThai, useXoaCongViec } from '../hooks/useTasks'
-import { useTraCuu } from '../hooks/useCatalog'
+import { ApiError } from '../api/http'
+import { formatDateTime, formatDate } from '../components/format'
+import { CommentPanel } from '../components/CommentPanel'
+import { ChangeHistory } from '../components/ChangeHistory'
+import { StatusBadge, PriorityBadge } from '../components/Badges'
+import { ErrorState, Loading, EmptyState } from '../components/LoadingState'
+import { SubtaskPanel } from '../components/SubtaskPanel'
+import { useUpdateProgress, useTaskDetail, useChangeStatus, useDeleteTask } from '../hooks/useTasks'
+import { useLookup } from '../hooks/useCatalog'
 
 /** Các nút thao tác. Chỉ hiện nút mà quyen cho phép; API vẫn tự chặn nếu ai đó gọi thẳng. */
-function HanhDong({ cv }: { cv: ChiTietCongViec }) {
+function TaskActions({ task }: { task: TaskDetail }) {
   const navigate = useNavigate()
-  const chuyen = useChuyenTrangThai(cv.id)
-  const tienDo = useCapNhatTienDo(cv.id)
-  const xoa = useXoaCongViec(cv.id)
-  const [giaTriTienDo, setGiaTriTienDo] = useState(cv.tienDo)
-  const [lyDo, setLyDo] = useState('')
-  const hopThoai = useRef<HTMLDialogElement>(null)
+  const changeStatus = useChangeStatus(task.id)
+  const updateProgress = useUpdateProgress(task.id)
+  const deleteTask = useDeleteTask(task.id)
+  const [progress, setProgress] = useState(task.tienDo)
+  const [reason, setReason] = useState('')
+  const dialogRef = useRef<HTMLDialogElement>(null)
   // Lỗi của thao tác gần nhất (mỗi mutation giữ error riêng nên không gộp bằng ??).
-  const [loi, setLoi] = useState<Error | null>(null)
-  const theoDoiLoi = { onError: (e: Error) => setLoi(e), onSuccess: () => setLoi(null) }
+  const [error, setError] = useState<Error | null>(null)
+  const trackError = { onError: (e: Error) => setError(e), onSuccess: () => setError(null) }
 
-  const { quyen } = cv
-  const dangXuLy = chuyen.isPending || tienDo.isPending || xoa.isPending
-  const coNut = Object.values(quyen).some(Boolean)
+  const { quyen: permissions } = task
+  const busy = changeStatus.isPending || updateProgress.isPending || deleteTask.isPending
+  const hasActions = Object.values(permissions).some(Boolean)
   // Người thực hiện đang làm nhưng chưa gửi duyệt được vì còn việc con chưa xong.
-  const conViecCon = quyen.danhDauViecCon && !quyen.guiDuyet ? cv.viecCon.filter((v) => !v.xong).length : 0
+  const remainingSubtasks = permissions.danhDauViecCon && !permissions.guiDuyet ? task.viecCon.filter((v) => !v.xong).length : 0
 
-  if (!coNut) return <p className="nho">Bạn chỉ có quyền xem công việc này.</p>
+  if (!hasActions) return <p className="muted">Bạn chỉ có quyền xem công việc này.</p>
 
   return (
-    <div className="hanh-dong">
-      <div className="nut-hang">
-        {quyen.batDau && (
-          <button type="button" disabled={dangXuLy} onClick={() => chuyen.mutate({ trangThai: 'DANG_LAM' }, theoDoiLoi)}>
+    <div className="actions">
+      <div className="button-row">
+        {permissions.batDau && (
+          <button type="button" disabled={busy} onClick={() => changeStatus.mutate({ trangThai: 'DANG_LAM' }, trackError)}>
             Bắt đầu làm
           </button>
         )}
-        {quyen.guiDuyet && (
-          <button type="button" disabled={dangXuLy} onClick={() => chuyen.mutate({ trangThai: 'CHO_DUYET' }, theoDoiLoi)}>
+        {permissions.guiDuyet && (
+          <button type="button" disabled={busy} onClick={() => changeStatus.mutate({ trangThai: 'CHO_DUYET' }, trackError)}>
             Gửi duyệt
           </button>
         )}
-        {quyen.duyet && (
-          <button type="button" disabled={dangXuLy} onClick={() => chuyen.mutate({ trangThai: 'HOAN_THANH' }, theoDoiLoi)}>
+        {permissions.duyet && (
+          <button type="button" disabled={busy} onClick={() => changeStatus.mutate({ trangThai: 'HOAN_THANH' }, trackError)}>
             Duyệt hoàn thành
           </button>
         )}
-        {quyen.traLai && (
-          <button type="button" className="phu" disabled={dangXuLy} onClick={() => hopThoai.current?.showModal()}>
+        {permissions.traLai && (
+          <button type="button" className="secondary" disabled={busy} onClick={() => dialogRef.current?.showModal()}>
             Trả lại
           </button>
         )}
-        {quyen.sua && (
-          <Link to={`/cong-viec/${cv.id}/sua`} className="nut phu">
+        {permissions.sua && (
+          <Link to={`/cong-viec/${task.id}/sua`} className="button secondary">
             Sửa
           </Link>
         )}
-        {quyen.xoa && (
+        {permissions.xoa && (
           <button
             type="button"
-            className="nguy-hiem"
-            disabled={dangXuLy}
+            className="danger"
+            disabled={busy}
             onClick={() => {
-              if (window.confirm(`Xóa công việc ${cv.ma}?`)) {
-                xoa.mutate(undefined, { onError: theoDoiLoi.onError, onSuccess: () => navigate('/cong-viec', { replace: true }) })
+              if (window.confirm(`Xóa công việc ${task.ma}?`)) {
+                deleteTask.mutate(undefined, { onError: trackError.onError, onSuccess: () => navigate('/cong-viec', { replace: true }) })
               }
             }}
           >
@@ -76,69 +76,69 @@ function HanhDong({ cv }: { cv: ChiTietCongViec }) {
         )}
       </div>
 
-      {conViecCon > 0 && (
-        <p className="nho">Còn {conViecCon} việc con chưa xong — hoàn thành hết để gửi duyệt.</p>
+      {remainingSubtasks > 0 && (
+        <p className="muted">Còn {remainingSubtasks} việc con chưa xong — hoàn thành hết để gửi duyệt.</p>
       )}
 
-      {quyen.capNhatTienDo && (
+      {permissions.capNhatTienDo && (
         <form
-          className="tien-do-form"
+          className="progress-form"
           onSubmit={(e) => {
             e.preventDefault()
-            tienDo.mutate({ tienDo: giaTriTienDo }, theoDoiLoi)
+            updateProgress.mutate({ tienDo: progress }, trackError)
           }}
         >
-          <label htmlFor="tienDo">Tiến độ</label>
+          <label htmlFor="progress">Tiến độ</label>
           <input
-            id="tienDo"
+            id="progress"
             type="range"
             min={0}
             max={100}
             step={5}
-            value={giaTriTienDo}
-            onChange={(e) => setGiaTriTienDo(Number(e.target.value))}
+            value={progress}
+            onChange={(e) => setProgress(Number(e.target.value))}
           />
-          <output htmlFor="tienDo">{giaTriTienDo}%</output>
-          <button type="submit" disabled={dangXuLy || giaTriTienDo === cv.tienDo}>
+          <output htmlFor="progress">{progress}%</output>
+          <button type="submit" disabled={busy || progress === task.tienDo}>
             Lưu tiến độ
           </button>
         </form>
       )}
 
-      {loi && (
-        <p className="loi-khoi" role="alert">
-          {loi.message}
+      {error && (
+        <p className="error-block" role="alert">
+          {error.message}
         </p>
       )}
 
-      <dialog ref={hopThoai} className="hop-thoai" onClose={() => setLyDo('')}>
+      <dialog ref={dialogRef} className="dialog" onClose={() => setReason('')}>
         <form
           method="dialog"
           onSubmit={(e) => {
-            if (!lyDo.trim()) {
+            if (!reason.trim()) {
               e.preventDefault()
               return
             }
-            chuyen.mutate({ trangThai: 'DANG_LAM', lyDo: lyDo.trim() }, theoDoiLoi)
+            changeStatus.mutate({ trangThai: 'DANG_LAM', lyDo: reason.trim() }, trackError)
           }}
         >
-          <h2>Trả lại công việc {cv.ma}</h2>
-          <label htmlFor="lyDo">Lý do trả lại *</label>
+          <h2>Trả lại công việc {task.ma}</h2>
+          <label htmlFor="return-reason">Lý do trả lại *</label>
           <textarea
-            id="lyDo"
+            id="return-reason"
             rows={3}
-            value={lyDo}
-            onChange={(e) => setLyDo(e.target.value)}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
             placeholder="Vd. Thiếu biên bản nghiệm thu có chữ ký tư vấn giám sát"
             required
             autoFocus
           />
-          {!lyDo.trim() && <p className="nho">Bắt buộc ghi lý do khi trả lại.</p>}
-          <div className="nut-hang">
-            <button type="submit" disabled={!lyDo.trim()}>
+          {!reason.trim() && <p className="muted">Bắt buộc ghi lý do khi trả lại.</p>}
+          <div className="button-row">
+            <button type="submit" disabled={!reason.trim()}>
               Trả lại
             </button>
-            <button type="button" className="phu" onClick={() => hopThoai.current?.close()}>
+            <button type="button" className="secondary" onClick={() => dialogRef.current?.close()}>
               Hủy
             </button>
           </div>
@@ -148,91 +148,91 @@ function HanhDong({ cv }: { cv: ChiTietCongViec }) {
   )
 }
 
-export default function ChiTietPage() {
+export default function DetailPage() {
   const { id = '' } = useParams()
-  const ct = useChiTietCongViec(id)
-  const tra = useTraCuu()
+  const detail = useTaskDetail(id)
+  const lookup = useLookup()
 
-  if (ct.isPending) return <DangTai />
-  if (ct.isError) {
+  if (detail.isPending) return <Loading />
+  if (detail.isError) {
     // 404: không tồn tại / không liên quan; 400: id sai định dạng — thử lại cũng vô ích.
-    if (ct.error instanceof LoiApi && (ct.error.status === 404 || ct.error.status === 400)) {
+    if (detail.error instanceof ApiError && (detail.error.status === 404 || detail.error.status === 400)) {
       return (
-        <KhongCoDuLieu>
+        <EmptyState>
           Không tìm thấy công việc, hoặc bạn không có liên quan tới công việc này.{' '}
           <Link to="/cong-viec">Về danh sách</Link>
-        </KhongCoDuLieu>
+        </EmptyState>
       )
     }
-    return <CoLoi loi={ct.error} thuLai={() => ct.refetch()} />
+    return <ErrorState error={detail.error} onRetry={() => detail.refetch()} />
   }
 
-  const cv = ct.data
+  const task = detail.data
   return (
-    <article className="chi-tiet">
+    <article className="detail">
       <p>
         <Link to="/cong-viec">‹ Danh sách</Link>
       </p>
-      {tra.loi && (
-        <p className="loi-khoi" role="alert">
-          Không tải được tên nhân viên/dự án: {tra.loi.message}{' '}
-          <button type="button" className="lien-ket" onClick={tra.thuLai}>
+      {lookup.error && (
+        <p className="error-block" role="alert">
+          Không tải được tên nhân viên/dự án: {lookup.error.message}{' '}
+          <button type="button" className="link-button" onClick={lookup.retry}>
             Thử lại
           </button>
         </p>
       )}
-      <header className="tieu-de-trang">
+      <header className="page-header">
         <div>
-          <span className="ma">{cv.ma}</span>
-          <h1>{cv.ten}</h1>
-          <NhanTrangThai trangThai={cv.trangThai} quaHan={cv.quaHan} />
+          <span className="code">{task.ma}</span>
+          <h1>{task.ten}</h1>
+          <StatusBadge status={task.trangThai} overdue={task.quaHan} />
         </div>
       </header>
 
       {/* key: đổi trạng thái/tiến độ từ nơi khác thì form tiến độ lấy lại giá trị mới */}
-      <HanhDong key={`${cv.trangThai}-${cv.tienDo}`} cv={cv} />
+      <TaskActions key={`${task.trangThai}-${task.tienDo}`} task={task} />
 
-      <dl className="luoi-thong-tin">
+      <dl className="info-grid">
         <dt>Dự án</dt>
-        <dd>{tra.tenDuAn(cv.duAnId)}</dd>
+        <dd>{lookup.projectName(task.duAnId)}</dd>
         <dt>Người giao</dt>
-        <dd>{tra.tenNguoi(cv.nguoiGiaoId)}</dd>
+        <dd>{lookup.employeeName(task.nguoiGiaoId)}</dd>
         <dt>Người thực hiện</dt>
-        <dd>{cv.nguoiThucHienIds.map(tra.tenNguoi).join(', ')}</dd>
+        <dd>{task.nguoiThucHienIds.map(lookup.employeeName).join(', ')}</dd>
         <dt>Người theo dõi</dt>
-        <dd>{cv.nguoiTheoDoiIds.length ? cv.nguoiTheoDoiIds.map(tra.tenNguoi).join(', ') : '—'}</dd>
+        <dd>{task.nguoiTheoDoiIds.length ? task.nguoiTheoDoiIds.map(lookup.employeeName).join(', ') : '—'}</dd>
         <dt>Ưu tiên</dt>
         <dd>
-          <NhanUuTien uuTien={cv.uuTien} />
+          <PriorityBadge priority={task.uuTien} />
         </dd>
         <dt>Bắt đầu</dt>
-        <dd>{dinhDangNgay(cv.batDau)}</dd>
+        <dd>{formatDate(task.batDau)}</dd>
         <dt>Hạn</dt>
-        <dd className={cv.quaHan ? 'chu-qua-han' : undefined}>{dinhDangNgay(cv.hetHan)}</dd>
+        <dd className={task.quaHan ? 'overdue-text' : undefined}>{formatDate(task.hetHan)}</dd>
         <dt>Tiến độ</dt>
         <dd>
-          <progress max={100} value={cv.tienDo} aria-label="Tiến độ" /> {cv.tienDo}%
+          <progress max={100} value={task.tienDo} aria-label="Tiến độ" /> {task.tienDo}%
         </dd>
         <dt>Tạo lúc</dt>
-        <dd>{dinhDangLuc(cv.taoLuc)}</dd>
+        <dd>{formatDateTime(task.taoLuc)}</dd>
         <dt>Cập nhật lúc</dt>
-        <dd>{dinhDangLuc(cv.capNhatLuc)}</dd>
+        <dd>{formatDateTime(task.capNhatLuc)}</dd>
       </dl>
 
-      {cv.moTa && (
+      {task.moTa && (
         <section>
           <h2>Mô tả</h2>
-          <p className="mo-ta">{cv.moTa}</p>
+          <p className="description">{task.moTa}</p>
         </section>
       )}
 
-      <ViecConPanel cv={cv} />
+      <SubtaskPanel task={task} />
 
-      <BinhLuanPanel congViecId={cv.id} />
+      <CommentPanel taskId={task.id} />
 
       <section>
         <h2>Lịch sử thay đổi</h2>
-        <LichSuThayDoi congViecId={cv.id} />
+        <ChangeHistory taskId={task.id} />
       </section>
     </article>
   )

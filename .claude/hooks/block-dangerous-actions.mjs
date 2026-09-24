@@ -3,7 +3,7 @@
 // Nhận JSON qua stdin; thoát mã 2 + ghi lý do ra stderr = chặn, Claude đọc được lý do.
 // Hook chạy chắc chắn mỗi lần gọi công cụ, không phụ thuộc Claude có "nhớ" lời dặn trong CLAUDE.md hay không.
 
-const LENH_CAM = [
+const BLOCKED_COMMANDS = [
   [/\bgit\s+reset\s+--hard\b/, 'git reset --hard xóa thay đổi chưa commit'],
   [/\bgit\s+push\b.*(--force\b|-f\b|--force-with-lease\b)/, 'push --force ghi đè lịch sử trên remote'],
   [/\bgit\s+push\b/, 'push lên remote phải do người dùng tự làm'],
@@ -27,43 +27,43 @@ const LENH_CAM = [
 ]
 
 // .env thật là bí mật; .env.example thì được.
-const FILE_BI_MAT = /(^|[\\/])\.env(\.(?!example$)[^\\/]+)?$/i
+const SECRET_FILE = /(^|[\\/])\.env(\.(?!example$)[^\\/]+)?$/i
 
 let raw = ''
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (d) => (raw += d))
 process.stdin.on('end', () => {
-  let vao
+  let input
   try {
-    vao = JSON.parse(raw)
+    input = JSON.parse(raw)
   } catch {
     process.exit(0) // không đọc được input thì không chặn nhầm
   }
-  const cong = vao.tool_name ?? ''
-  const tham = vao.tool_input ?? {}
+  const tool = input.tool_name ?? ''
+  const toolInput = input.tool_input ?? {}
 
-  if (cong === 'Bash' || cong === 'PowerShell') {
-    const lenh = String(tham.command ?? '')
-    for (const [mau, lyDo] of LENH_CAM) {
-      if (mau.test(lenh)) {
-        process.stderr.write(`Bị chặn bởi hook dự án: ${lyDo}. Lệnh: ${lenh}\nNếu thật sự cần, hãy nhờ người dùng tự chạy.`)
+  if (tool === 'Bash' || tool === 'PowerShell') {
+    const command = String(toolInput.command ?? '')
+    for (const [pattern, reason] of BLOCKED_COMMANDS) {
+      if (pattern.test(command)) {
+        process.stderr.write(`Bị chặn bởi hook dự án: ${reason}. Lệnh: ${command}\nNếu thật sự cần, hãy nhờ người dùng tự chạy.`)
         process.exit(2)
       }
     }
     // Chỉ chặn khi có lệnh đọc/ghi thật sự trỏ vào file .env (không chặn chữ ".env" trong commit message).
     // Ranh giới từ theo Unicode: \b của JS chỉ hiểu ASCII nên "việc" từng bị hiểu là lệnh `vi`.
-    const DOC_GHI_ENV =
+    const ENV_READ_WRITE =
       /(?<![\p{L}\p{N}_-])(cat|type|less|more|head|tail|bat|nano|vim?|code|notepad|Get-Content|gc|Set-Content|sed|awk|grep|rg|findstr|cp|copy|mv|move|source)(?![\p{L}\p{N}_-])[^|;&\n]*?[\s'"\\/=]\.env(\.(?!example(?![\p{L}\p{N}_]))[\p{L}\p{N}_]+)?(?=$|[\s'"|;&)])|>{1,2}\s*\S*\.env(\.(?!example(?![\p{L}\p{N}_]))[\p{L}\p{N}_]+)?(?=$|[\s'"|;&)])|(^|[;&|]\s*)\.\s+\S*\.env(?![\p{L}\p{N}_.])/mu
-    if (DOC_GHI_ENV.test(lenh)) {
+    if (ENV_READ_WRITE.test(command)) {
       process.stderr.write('Bị chặn: không đọc/ghi file .env qua shell. Dùng .env.example.')
       process.exit(2)
     }
   }
 
-  if (['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(cong)) {
-    const duongDan = String(tham.file_path ?? tham.notebook_path ?? '')
-    if (FILE_BI_MAT.test(duongDan)) {
-      process.stderr.write(`Bị chặn: ${duongDan} có thể chứa bí mật. Dùng .env.example để xem các biến cần có.`)
+  if (['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
+    const filePath = String(toolInput.file_path ?? toolInput.notebook_path ?? '')
+    if (SECRET_FILE.test(filePath)) {
+      process.stderr.write(`Bị chặn: ${filePath} có thể chứa bí mật. Dùng .env.example để xem các biến cần có.`)
       process.exit(2)
     }
   }

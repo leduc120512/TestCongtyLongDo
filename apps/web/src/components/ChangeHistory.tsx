@@ -1,84 +1,84 @@
 import {
-  TEN_HANH_DONG,
-  TEN_TRANG_THAI,
-  TEN_TRUONG,
-  TEN_UU_TIEN,
-  type ThayDoiTruong,
-  type TrangThai,
-  type UuTien,
+  HISTORY_ACTION_LABELS,
+  STATUS_LABELS,
+  FIELD_LABELS,
+  PRIORITY_LABELS,
+  type FieldChange,
+  type TaskStatus,
+  type Priority,
 } from '@longdo/contracts'
-import { useLichSuCongViec } from '../hooks/useTasks'
-import { useTraCuu } from '../hooks/useCatalog'
-import { dinhDangLuc, dinhDangNgay } from './format'
-import { CoLoi, DangTai, KhongCoDuLieu } from './LoadingState'
+import { useTaskHistory } from '../hooks/useTasks'
+import { useLookup } from '../hooks/useCatalog'
+import { formatDateTime, formatDate } from './format'
+import { ErrorState, Loading, EmptyState } from './LoadingState'
 
-type TraCuu = ReturnType<typeof useTraCuu>
+type Lookup = ReturnType<typeof useLookup>
 
 /** Đổi giá trị thô trong lịch sử (id, enum, ngày) thành chữ người đọc được. */
-function hienGiaTri(truong: string, giaTri: unknown, tra: TraCuu): string {
-  if (giaTri === null || giaTri === undefined || giaTri === '') return '(trống)'
-  switch (truong) {
+function displayValue(field: string, value: unknown, lookup: Lookup): string {
+  if (value === null || value === undefined || value === '') return '(trống)'
+  switch (field) {
     case 'nguoiThucHienIds':
     case 'nguoiTheoDoiIds':
-      return (giaTri as string[]).map(tra.tenNguoi).join(', ') || '(trống)'
+      return (value as string[]).map(lookup.employeeName).join(', ') || '(trống)'
     case 'duAnId':
-      return tra.tenDuAn(giaTri as string)
+      return lookup.projectName(value as string)
     case 'trangThai':
-      return TEN_TRANG_THAI[giaTri as TrangThai] ?? String(giaTri)
+      return STATUS_LABELS[value as TaskStatus] ?? String(value)
     case 'uuTien':
-      return TEN_UU_TIEN[giaTri as UuTien] ?? String(giaTri)
+      return PRIORITY_LABELS[value as Priority] ?? String(value)
     case 'batDau':
     case 'hetHan':
-      return dinhDangNgay(giaTri as string)
+      return formatDate(value as string)
     case 'tienDo':
-      return `${giaTri}%`
+      return `${value}%`
     case 'deletedAt':
-      return dinhDangLuc(giaTri as string)
+      return formatDateTime(value as string)
     case 'viecCon': {
-      const vc = giaTri as { ten: string; xong: boolean }
-      return `${vc.xong ? '☑' : '☐'} ${vc.ten}`
+      const subtask = value as { ten: string; xong: boolean }
+      return `${subtask.xong ? '☑' : '☐'} ${subtask.ten}`
     }
     default:
-      return String(giaTri)
+      return String(value)
   }
 }
 
-function DongThayDoi({ td, tra }: { td: ThayDoiTruong; tra: TraCuu }) {
+function ChangeLine({ change, lookup }: { change: FieldChange; lookup: Lookup }) {
   return (
     <li>
-      <strong>{TEN_TRUONG[td.truong] ?? td.truong}</strong>: <span className="cu">{hienGiaTri(td.truong, td.tu, tra)}</span>
+      <strong>{FIELD_LABELS[change.truong] ?? change.truong}</strong>: <span className="old-value">{displayValue(change.truong, change.tu, lookup)}</span>
       {' → '}
-      <span className="moi">{hienGiaTri(td.truong, td.den, tra)}</span>
+      <span className="new-value">{displayValue(change.truong, change.den, lookup)}</span>
     </li>
   )
 }
 
-export function LichSuThayDoi({ congViecId }: { congViecId: string }) {
-  const ls = useLichSuCongViec(congViecId)
-  const tra = useTraCuu()
+export function ChangeHistory({ taskId }: { taskId: string }) {
+  const historyQuery = useTaskHistory(taskId)
+  const lookup = useLookup()
 
-  if (ls.isPending) return <DangTai noiDung="Đang tải lịch sử…" />
-  if (ls.isError) return <CoLoi loi={ls.error} thuLai={() => ls.refetch()} />
-  if (ls.data.length === 0) return <KhongCoDuLieu>Chưa có thay đổi nào.</KhongCoDuLieu>
+  if (historyQuery.isPending) return <Loading label="Đang tải lịch sử…" />
+  if (historyQuery.isError) return <ErrorState error={historyQuery.error} onRetry={() => historyQuery.refetch()} />
+  if (historyQuery.data.length === 0) return <EmptyState>Chưa có thay đổi nào.</EmptyState>
 
   return (
-    <ol className="lich-su">
-      {ls.data.map((dong) => (
-        <li key={dong.id}>
-          <div className="lich-su-dau">
-            <strong>{tra.tenNguoi(dong.nguoiDoiId)}</strong> · {TEN_HANH_DONG[dong.hanhDong]}
-            <time dateTime={dong.luc} className="nho">
-              {dinhDangLuc(dong.luc)}
+    <ol className="history">
+      {historyQuery.data.map((entry) => (
+        <li key={entry.id}>
+          <div className="entry-header">
+            <strong>{lookup.employeeName(entry.nguoiDoiId)}</strong> · {HISTORY_ACTION_LABELS[entry.hanhDong]}
+            <time dateTime={entry.luc} className="muted">
+              {formatDateTime(entry.luc)}
             </time>
           </div>
-          {dong.thayDoi.length > 0 && (
+          {entry.thayDoi.length > 0 && (
             <ul>
-              {dong.thayDoi.map((td) => (
-                <DongThayDoi key={td.truong} td={td} tra={tra} />
+              {entry.thayDoi.map((change) => (
+                <ChangeLine key={change.truong} change={change} lookup={lookup} />
               ))}
             </ul>
           )}
-          {dong.lyDo && <p className="ly-do">Lý do: {dong.lyDo}</p>}
+          {entry.lyDo && <p className="reason">Lý do: {entry.lyDo}</p>}
         </li>
       ))}
     </ol>

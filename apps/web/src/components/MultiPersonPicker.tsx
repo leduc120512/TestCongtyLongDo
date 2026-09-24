@@ -1,44 +1,44 @@
-import type { NhanVien } from '@longdo/contracts'
+import type { Employee } from '@longdo/contracts'
 
 /** Chọn nhiều người bằng checkbox — nhẹ, không cần thư viện select. */
-export function ChonNhieuNguoi({
+export function MultiPersonPicker({
   id,
-  nhanVien,
-  giaTri,
+  employees,
+  value,
   onChange,
-  loaiTru = [],
-  coLoi,
+  excluded = [],
+  invalid,
 }: {
   id: string
-  nhanVien: NhanVien[]
-  giaTri: string[]
+  employees: Employee[]
+  value: string[]
   onChange: (ids: string[]) => void
   /** Người không được chọn ở ô này (vd. đã là người thực hiện thì không cần theo dõi). */
-  loaiTru?: string[]
-  coLoi?: boolean
+  excluded?: string[]
+  invalid?: boolean
 }) {
-  const doi = (nvId: string, chon: boolean) =>
-    onChange(chon ? [...giaTri, nvId] : giaTri.filter((x) => x !== nvId))
+  const toggle = (employeeId: string, checked: boolean) =>
+    onChange(checked ? [...value, employeeId] : value.filter((x) => x !== employeeId))
 
   return (
     <div
       id={id}
-      className={`chon-nhieu${coLoi ? ' co-loi' : ''}`}
+      className={`multi-picker${invalid ? ' invalid' : ''}`}
       role="group"
-      aria-labelledby={`${id}-nhan`}
-      aria-invalid={coLoi}
+      aria-labelledby={`${id}-label`}
+      aria-invalid={invalid}
     >
-      {nhanVien.map((nv) => {
-        const biLoai = loaiTru.includes(nv.id)
+      {employees.map((employee) => {
+        const isExcluded = excluded.includes(employee.id)
         return (
-          <label key={nv.id} className={biLoai ? 'mo' : undefined}>
+          <label key={employee.id} className={isExcluded ? 'dimmed' : undefined}>
             <input
               type="checkbox"
-              checked={giaTri.includes(nv.id)}
-              disabled={biLoai}
-              onChange={(e) => doi(nv.id, e.target.checked)}
+              checked={value.includes(employee.id)}
+              disabled={isExcluded}
+              onChange={(e) => toggle(employee.id, e.target.checked)}
             />
-            {nv.ten} <span className="nho">· {nv.chucVu}</span>
+            {employee.ten} <span className="muted">· {employee.chucVu}</span>
           </label>
         )
       })}

@@ -2,9 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, StrictMode, Suspense, type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Link, Navigate, RouterProvider, useRouteError } from 'react-router'
-import { LoiApi } from './api/http'
+import { ApiError } from './api/http'
 import { Layout } from './components/Layout'
-import { DangTai, KhongCoDuLieu } from './components/LoadingState'
+import { Loading, EmptyState } from './components/LoadingState'
 import './styles.css'
 
 const queryClient = new QueryClient({
@@ -13,26 +13,26 @@ const queryClient = new QueryClient({
       staleTime: 15_000,
       refetchOnWindowFocus: false,
       // Lỗi 4xx (không quyền, không tìm thấy, sai dữ liệu) thử lại cũng vô ích.
-      retry: (lan, loi) => !(loi instanceof LoiApi && loi.status >= 400 && loi.status < 500) && lan < 2,
+      retry: (attempt, error) => !(error instanceof ApiError && error.status >= 400 && error.status < 500) && attempt < 2,
     },
   },
 })
 
 /** Tách mỗi trang thành chunk riêng, tải khi cần → bundle ban đầu nhẹ. */
-function trangLuoi(nap: () => Promise<{ default: ComponentType }>) {
-  const Trang = lazy(nap)
+function lazyPage(load: () => Promise<{ default: ComponentType }>) {
+  const Page = lazy(load)
   return (
-    <Suspense fallback={<DangTai />}>
-      <Trang />
+    <Suspense fallback={<Loading />}>
+      <Page />
     </Suspense>
   )
 }
 
-function LoiTrang() {
-  const loi = useRouteError()
+function RouteError() {
+  const error = useRouteError()
   return (
-    <div className="trang-thai loi" role="alert">
-      <p>Trang gặp lỗi: {loi instanceof Error ? loi.message : 'không rõ'}</p>
+    <div className="state error" role="alert">
+      <p>Trang gặp lỗi: {error instanceof Error ? error.message : 'không rõ'}</p>
       <button type="button" onClick={() => window.location.reload()}>
         Tải lại
       </button>
@@ -44,19 +44,19 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
-    errorElement: <LoiTrang />,
+    errorElement: <RouteError />,
     children: [
       { index: true, element: <Navigate to="/cong-viec" replace /> },
-      { path: 'cong-viec', element: trangLuoi(() => import('./pages/ListPage')) },
-      { path: 'cong-viec/tao', element: trangLuoi(() => import('./pages/CreatePage')) },
-      { path: 'cong-viec/:id', element: trangLuoi(() => import('./pages/DetailPage')) },
-      { path: 'cong-viec/:id/sua', element: trangLuoi(() => import('./pages/EditPage')) },
+      { path: 'cong-viec', element: lazyPage(() => import('./pages/ListPage')) },
+      { path: 'cong-viec/tao', element: lazyPage(() => import('./pages/CreatePage')) },
+      { path: 'cong-viec/:id', element: lazyPage(() => import('./pages/DetailPage')) },
+      { path: 'cong-viec/:id/sua', element: lazyPage(() => import('./pages/EditPage')) },
       {
         path: '*',
         element: (
-          <KhongCoDuLieu>
+          <EmptyState>
             Không có trang này. <Link to="/cong-viec">Về danh sách công việc</Link>
-          </KhongCoDuLieu>
+          </EmptyState>
         ),
       },
     ],

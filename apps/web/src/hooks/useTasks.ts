@@ -1,150 +1,150 @@
 import type {
-  CapNhatTienDo,
-  ChiTietCongViec,
-  ChuyenTrangThai,
-  DanhSachCongViecQuery,
-  SuaCongViecInput,
-  TaoCongViec,
+  UpdateProgress,
+  TaskDetail,
+  ChangeStatus,
+  TaskListQuery,
+  UpdateTaskInput,
+  CreateTask,
 } from '@longdo/contracts'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { congViecApi, type BoLocDem } from '../api/task.api'
-import { usePhien } from '../auth/session'
+import { taskApi, type CountFilter } from '../api/task.api'
+import { useSession } from '../auth/session'
 
 /**
  * Khóa cache luôn có userId: dữ liệu của người này không bao giờ hiện cho người khác,
  * kể cả khi một yêu cầu của người trước trả về sau khi đã đổi người đăng nhập.
  */
-export const khoaCongViec = {
-  tatCa: (uid: string) => ['cong-viec', uid] as const,
-  danhSach: (uid: string, q: DanhSachCongViecQuery) => ['cong-viec', uid, 'danh-sach', q] as const,
-  dem: (uid: string, q: BoLocDem) => ['cong-viec', uid, 'dem', q] as const,
-  chiTiet: (uid: string, id: string) => ['cong-viec', uid, 'chi-tiet', id] as const,
-  lichSu: (uid: string, id: string) => ['cong-viec', uid, 'lich-su', id] as const,
-  binhLuan: (uid: string, id: string) => ['cong-viec', uid, 'binh-luan', id] as const,
+export const taskKeys = {
+  all: (uid: string) => ['tasks', uid] as const,
+  list: (uid: string, q: TaskListQuery) => ['tasks', uid, 'list', q] as const,
+  count: (uid: string, q: CountFilter) => ['tasks', uid, 'count', q] as const,
+  detail: (uid: string, id: string) => ['tasks', uid, 'detail', id] as const,
+  history: (uid: string, id: string) => ['tasks', uid, 'history', id] as const,
+  comments: (uid: string, id: string) => ['tasks', uid, 'comments', id] as const,
 }
 
 function useUid(): string {
-  return usePhien()?.nhanVien.id ?? ''
+  return useSession()?.nhanVien.id ?? ''
 }
 
-export function useDanhSachCongViec(q: DanhSachCongViecQuery) {
+export function useTaskList(q: TaskListQuery) {
   const uid = useUid()
   return useQuery({
-    queryKey: khoaCongViec.danhSach(uid, q),
-    queryFn: () => congViecApi.danhSach(q),
+    queryKey: taskKeys.list(uid, q),
+    queryFn: () => taskApi.list(q),
     // Giữ trang cũ khi đổi bộ lọc/trang để bảng không nháy trắng (chỉ trong cùng một người dùng,
     // vì trang được dựng lại khi đổi người — xem Layout).
     placeholderData: keepPreviousData,
   })
 }
 
-export function useDemLocNhanh(q: BoLocDem) {
+export function useQuickFilterCounts(q: CountFilter) {
   const uid = useUid()
   return useQuery({
-    queryKey: khoaCongViec.dem(uid, q),
-    queryFn: () => congViecApi.dem(q),
+    queryKey: taskKeys.count(uid, q),
+    queryFn: () => taskApi.count(q),
     placeholderData: keepPreviousData,
   })
 }
 
-export function useChiTietCongViec(id: string) {
+export function useTaskDetail(id: string) {
   const uid = useUid()
-  return useQuery({ queryKey: khoaCongViec.chiTiet(uid, id), queryFn: () => congViecApi.chiTiet(id) })
+  return useQuery({ queryKey: taskKeys.detail(uid, id), queryFn: () => taskApi.get(id) })
 }
 
-export function useLichSuCongViec(id: string) {
+export function useTaskHistory(id: string) {
   const uid = useUid()
-  return useQuery({ queryKey: khoaCongViec.lichSu(uid, id), queryFn: () => congViecApi.lichSu(id) })
+  return useQuery({ queryKey: taskKeys.history(uid, id), queryFn: () => taskApi.history(id) })
 }
 
 /** Sau mỗi thay đổi: đặt ngay chi tiết mới vào cache, làm mới danh sách/số đếm/lịch sử (không chờ). */
-function useSauKhiDoi() {
+function useAfterChange() {
   const qc = useQueryClient()
   const uid = useUid()
-  return (cv: ChiTietCongViec) => {
-    qc.setQueryData(khoaCongViec.chiTiet(uid, cv.id), cv)
+  return (task: TaskDetail) => {
+    qc.setQueryData(taskKeys.detail(uid, task.id), task)
     void qc.invalidateQueries({
-      queryKey: khoaCongViec.tatCa(uid),
+      queryKey: taskKeys.all(uid),
       // Bình luận không đổi khi công việc đổi nên không cần tải lại.
-      predicate: (q) => !(q.queryKey[3] === cv.id && (q.queryKey[2] === 'chi-tiet' || q.queryKey[2] === 'binh-luan')),
+      predicate: (q) => !(q.queryKey[3] === task.id && (q.queryKey[2] === 'detail' || q.queryKey[2] === 'comments')),
     })
   }
 }
 
-export function useTaoCongViec() {
-  const sauKhiDoi = useSauKhiDoi()
-  return useMutation({ mutationFn: (body: TaoCongViec) => congViecApi.tao(body), onSuccess: sauKhiDoi })
+export function useCreateTask() {
+  const afterChange = useAfterChange()
+  return useMutation({ mutationFn: (body: CreateTask) => taskApi.create(body), onSuccess: afterChange })
 }
 
-export function useSuaCongViec(id: string) {
-  const sauKhiDoi = useSauKhiDoi()
-  return useMutation({ mutationFn: (body: SuaCongViecInput) => congViecApi.sua(id, body), onSuccess: sauKhiDoi })
+export function useUpdateTask(id: string) {
+  const afterChange = useAfterChange()
+  return useMutation({ mutationFn: (body: UpdateTaskInput) => taskApi.update(id, body), onSuccess: afterChange })
 }
 
-export function useChuyenTrangThai(id: string) {
-  const sauKhiDoi = useSauKhiDoi()
+export function useChangeStatus(id: string) {
+  const afterChange = useAfterChange()
   return useMutation({
-    mutationFn: (body: ChuyenTrangThai) => congViecApi.chuyenTrangThai(id, body),
-    onSuccess: sauKhiDoi,
+    mutationFn: (body: ChangeStatus) => taskApi.changeStatus(id, body),
+    onSuccess: afterChange,
   })
 }
 
-export function useCapNhatTienDo(id: string) {
-  const sauKhiDoi = useSauKhiDoi()
+export function useUpdateProgress(id: string) {
+  const afterChange = useAfterChange()
   return useMutation({
-    mutationFn: (body: CapNhatTienDo) => congViecApi.capNhatTienDo(id, body),
-    onSuccess: sauKhiDoi,
+    mutationFn: (body: UpdateProgress) => taskApi.updateProgress(id, body),
+    onSuccess: afterChange,
   })
 }
 
-export function useXoaCongViec(id: string) {
+export function useDeleteTask(id: string) {
   const qc = useQueryClient()
   const uid = useUid()
   return useMutation({
-    mutationFn: () => congViecApi.xoa(id),
+    mutationFn: () => taskApi.remove(id),
     onSuccess: () => {
       // Bỏ hẳn chi tiết và lịch sử của việc đã xóa (tải lại chỉ nhận 404), làm mới danh sách và số đếm.
-      qc.removeQueries({ queryKey: khoaCongViec.chiTiet(uid, id) })
-      qc.removeQueries({ queryKey: khoaCongViec.lichSu(uid, id) })
-      qc.removeQueries({ queryKey: khoaCongViec.binhLuan(uid, id) })
-      void qc.invalidateQueries({ queryKey: [...khoaCongViec.tatCa(uid), 'danh-sach'] })
-      void qc.invalidateQueries({ queryKey: [...khoaCongViec.tatCa(uid), 'dem'] })
+      qc.removeQueries({ queryKey: taskKeys.detail(uid, id) })
+      qc.removeQueries({ queryKey: taskKeys.history(uid, id) })
+      qc.removeQueries({ queryKey: taskKeys.comments(uid, id) })
+      void qc.invalidateQueries({ queryKey: [...taskKeys.all(uid), 'list'] })
+      void qc.invalidateQueries({ queryKey: [...taskKeys.all(uid), 'count'] })
     },
   })
 }
 
 // ---------- Việc con ----------
 
-export function useThemViecCon(id: string) {
-  const sauKhiDoi = useSauKhiDoi()
-  return useMutation({ mutationFn: (ten: string) => congViecApi.themViecCon(id, ten), onSuccess: sauKhiDoi })
+export function useAddSubtask(id: string) {
+  const afterChange = useAfterChange()
+  return useMutation({ mutationFn: (name: string) => taskApi.addSubtask(id, name), onSuccess: afterChange })
 }
 
-export function useDanhDauViecCon(id: string) {
-  const sauKhiDoi = useSauKhiDoi()
+export function useMarkSubtask(id: string) {
+  const afterChange = useAfterChange()
   return useMutation({
-    mutationFn: (v: { viecConId: string; xong: boolean }) => congViecApi.danhDauViecCon(id, v.viecConId, v.xong),
-    onSuccess: sauKhiDoi,
+    mutationFn: (v: { subtaskId: string; done: boolean }) => taskApi.markSubtask(id, v.subtaskId, v.done),
+    onSuccess: afterChange,
   })
 }
 
-export function useXoaViecCon(id: string) {
-  const sauKhiDoi = useSauKhiDoi()
-  return useMutation({ mutationFn: (viecConId: string) => congViecApi.xoaViecCon(id, viecConId), onSuccess: sauKhiDoi })
+export function useRemoveSubtask(id: string) {
+  const afterChange = useAfterChange()
+  return useMutation({ mutationFn: (subtaskId: string) => taskApi.removeSubtask(id, subtaskId), onSuccess: afterChange })
 }
 
 // ---------- Bình luận ----------
 
-export function useBinhLuan(id: string) {
+export function useComments(id: string) {
   const uid = useUid()
-  return useQuery({ queryKey: khoaCongViec.binhLuan(uid, id), queryFn: () => congViecApi.binhLuan(id) })
+  return useQuery({ queryKey: taskKeys.comments(uid, id), queryFn: () => taskApi.comments(id) })
 }
 
-export function useVietBinhLuan(id: string) {
+export function useAddComment(id: string) {
   const qc = useQueryClient()
   const uid = useUid()
   return useMutation({
-    mutationFn: (noiDung: string) => congViecApi.vietBinhLuan(id, noiDung),
-    onSuccess: () => qc.invalidateQueries({ queryKey: khoaCongViec.binhLuan(uid, id) }),
+    mutationFn: (content: string) => taskApi.addComment(id, content),
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKeys.comments(uid, id) }),
   })
 }

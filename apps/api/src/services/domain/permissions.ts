@@ -1,31 +1,31 @@
-import type { QuyenCongViec, TrangThai } from '@longdo/contracts'
-import { coTheQuanLyViecCon, soViecConChuaXong } from './subtasks.ts'
+import type { TaskPermissions, TaskStatus } from '@longdo/contracts'
+import { canManageSubtasks, countUnfinished } from './subtasks.ts'
 
-type CongViecToiThieu = {
+type TaskLike = {
   nguoiGiaoId: string
   nguoiThucHienIds: string[]
   nguoiTheoDoiIds: string[]
-  trangThai: TrangThai
+  trangThai: TaskStatus
   viecCon?: ReadonlyArray<{ xong: boolean }>
 }
 
-export type VaiTro = {
-  laNguoiGiao: boolean
-  laNguoiThucHien: boolean
-  laNguoiTheoDoi: boolean
+export type Roles = {
+  isAssigner: boolean
+  isAssignee: boolean
+  isFollower: boolean
   /** Có ít nhất một vai trò trên công việc. Không liên quan thì không thấy công việc. */
-  coLienQuan: boolean
+  isInvolved: boolean
 }
 
-export function xacDinhVaiTro(cv: Omit<CongViecToiThieu, 'trangThai'>, userId: string): VaiTro {
-  const laNguoiGiao = cv.nguoiGiaoId === userId
-  const laNguoiThucHien = cv.nguoiThucHienIds.includes(userId)
-  const laNguoiTheoDoi = cv.nguoiTheoDoiIds.includes(userId)
+export function getRoles(task: Omit<TaskLike, 'trangThai'>, userId: string): Roles {
+  const isAssigner = task.nguoiGiaoId === userId
+  const isAssignee = task.nguoiThucHienIds.includes(userId)
+  const isFollower = task.nguoiTheoDoiIds.includes(userId)
   return {
-    laNguoiGiao,
-    laNguoiThucHien,
-    laNguoiTheoDoi,
-    coLienQuan: laNguoiGiao || laNguoiThucHien || laNguoiTheoDoi,
+    isAssigner,
+    isAssignee,
+    isFollower,
+    isInvolved: isAssigner || isAssignee || isFollower,
   }
 }
 
@@ -33,22 +33,22 @@ export function xacDinhVaiTro(cv: Omit<CongViecToiThieu, 'trangThai'>, userId: s
  * Quyền theo vai trò VÀ trạng thái hiện tại. Web dùng để ẩn/hiện nút,
  * service dùng để chặn. Một người có thể vừa giao vừa thực hiện (việc cá nhân).
  */
-export function tinhQuyen(cv: CongViecToiThieu, userId: string): QuyenCongViec {
-  const vt = xacDinhVaiTro(cv, userId)
-  const chuaXong = cv.trangThai !== 'HOAN_THANH'
-  const dangLam = cv.trangThai === 'DANG_LAM'
-  const viecCon = cv.viecCon ?? []
+export function getPermissions(task: TaskLike, userId: string): TaskPermissions {
+  const roles = getRoles(task, userId)
+  const notDone = task.trangThai !== 'HOAN_THANH'
+  const inProgress = task.trangThai === 'DANG_LAM'
+  const subtasks = task.viecCon ?? []
   return {
-    sua: vt.laNguoiGiao && chuaXong,
-    xoa: vt.laNguoiGiao && chuaXong,
-    batDau: vt.laNguoiThucHien && cv.trangThai === 'CHUA_BAT_DAU',
+    sua: roles.isAssigner && notDone,
+    xoa: roles.isAssigner && notDone,
+    batDau: roles.isAssignee && task.trangThai === 'CHUA_BAT_DAU',
     // Có việc con chưa xong thì chưa gửi duyệt được.
-    guiDuyet: vt.laNguoiThucHien && dangLam && soViecConChuaXong(viecCon) === 0,
-    duyet: vt.laNguoiGiao && cv.trangThai === 'CHO_DUYET',
-    traLai: vt.laNguoiGiao && cv.trangThai === 'CHO_DUYET',
+    guiDuyet: roles.isAssignee && inProgress && countUnfinished(subtasks) === 0,
+    duyet: roles.isAssigner && task.trangThai === 'CHO_DUYET',
+    traLai: roles.isAssigner && task.trangThai === 'CHO_DUYET',
     // Có việc con thì tiến độ tự tính, không nhập tay.
-    capNhatTienDo: vt.laNguoiThucHien && dangLam && viecCon.length === 0,
-    quanLyViecCon: vt.laNguoiGiao && coTheQuanLyViecCon(cv.trangThai),
-    danhDauViecCon: vt.laNguoiThucHien && dangLam,
+    capNhatTienDo: roles.isAssignee && inProgress && subtasks.length === 0,
+    quanLyViecCon: roles.isAssigner && canManageSubtasks(task.trangThai),
+    danhDauViecCon: roles.isAssignee && inProgress,
   }
 }

@@ -1,10 +1,10 @@
-import type { TrangThai } from '@longdo/contracts'
+import type { TaskStatus } from '@longdo/contracts'
 
-type ViecConToiThieu = { xong: boolean }
+type SubtaskLike = { xong: boolean }
 
 /** Số việc con chưa xong. */
-export function soViecConChuaXong(viecCon: readonly ViecConToiThieu[]): number {
-  return viecCon.filter((v) => !v.xong).length
+export function countUnfinished(subtasks: readonly SubtaskLike[]): number {
+  return subtasks.filter((v) => !v.xong).length
 }
 
 /**
@@ -12,13 +12,13 @@ export function soViecConChuaXong(viecCon: readonly ViecConToiThieu[]): number {
  * - Không có việc con: giữ tiến độ nhập tay.
  * - Chờ duyệt / Hoàn thành: giữ nguyên (đề bài: sang Chờ duyệt thì tiến độ là 100%).
  */
-export function tinhTienDo(viecCon: readonly ViecConToiThieu[], trangThai: TrangThai, tienDoHienTai: number): number {
-  if (viecCon.length === 0) return tienDoHienTai
-  if (trangThai === 'CHO_DUYET' || trangThai === 'HOAN_THANH') return tienDoHienTai
-  return Math.round(((viecCon.length - soViecConChuaXong(viecCon)) * 100) / viecCon.length)
+export function computeProgress(subtasks: readonly SubtaskLike[], trangThai: TaskStatus, currentProgress: number): number {
+  if (subtasks.length === 0) return currentProgress
+  if (trangThai === 'CHO_DUYET' || trangThai === 'HOAN_THANH') return currentProgress
+  return Math.round(((subtasks.length - countUnfinished(subtasks)) * 100) / subtasks.length)
 }
 
 /** Người giao chỉ thêm/xóa việc con khi việc chưa bắt đầu hoặc đang làm (chờ duyệt thì phải trả lại trước). */
-export function coTheQuanLyViecCon(trangThai: TrangThai): boolean {
+export function canManageSubtasks(trangThai: TaskStatus): boolean {
   return trangThai === 'CHUA_BAT_DAU' || trangThai === 'DANG_LAM'
 }

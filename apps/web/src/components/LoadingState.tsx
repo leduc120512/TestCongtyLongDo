@@ -1,26 +1,26 @@
 import type { ReactNode } from 'react'
 
-export function DangTai({ noiDung = 'Đang tải…' }: { noiDung?: string }) {
+export function Loading({ label = 'Đang tải…' }: { label?: string }) {
   return (
-    <div className="trang-thai" role="status" aria-live="polite">
-      <span className="vong-quay" aria-hidden />
-      {noiDung}
+    <div className="state" role="status" aria-live="polite">
+      <span className="spinner" aria-hidden />
+      {label}
     </div>
   )
 }
 
-export function CoLoi({ loi, thuLai }: { loi: unknown; thuLai: () => void }) {
-  const thongBao = loi instanceof Error ? loi.message : 'Đã có lỗi xảy ra'
+export function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const message = error instanceof Error ? error.message : 'Đã có lỗi xảy ra'
   return (
-    <div className="trang-thai loi" role="alert">
-      <p>{thongBao}</p>
-      <button type="button" onClick={thuLai}>
+    <div className="state error" role="alert">
+      <p>{message}</p>
+      <button type="button" onClick={onRetry}>
         Thử lại
       </button>
     </div>
   )
 }
 
-export function KhongCoDuLieu({ children }: { children: ReactNode }) {
-  return <div className="trang-thai trong">{children}</div>
+export function EmptyState({ children }: { children: ReactNode }) {
+  return <div className="state empty">{children}</div>
 }

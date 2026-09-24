@@ -22,7 +22,7 @@ Mở http://localhost:5173 rồi chọn **"Đang đăng nhập là"** ở góc t
 Kiểm tra (typecheck 3 package + 155 test; test tích hợp cần Mongo đang chạy):
 
 ```bash
-pnpm kiem-tra
+pnpm verify
 ```
 
 Cấu hình tùy chọn: sao chép `apps/api/.env.example` thành `apps/api/.env`. Không có file này thì dùng mặc định cho dev.
@@ -97,11 +97,11 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 
 ## Câu hỏi thiết kế
 
-**1. Quá hạn: lưu hay tính khi đọc?** Tôi chọn tính khi đọc (`laQuaHan`) và không lưu.
+**1. Quá hạn: lưu hay tính khi đọc?** Tôi chọn tính khi đọc (`isOverdue`) và không lưu.
 - Được: không lệch thời gian. Đúng 00:00 giờ VN là việc thành quá hạn, không phải chờ job, và không phải đổi luồng trạng thái. Một việc vừa "Đang làm" vừa "Quá hạn" là chuyện bình thường; nếu lưu thành trạng thái thì hai khái niệm này phải gộp làm một.
 - Mất: không lọc được bằng một giá trị có sẵn, và muốn gửi thông báo khi vừa quá hạn thì vẫn cần job riêng.
 - Lưu thành trạng thái thì ngược lại. Truy vấn và thông báo đơn giản hơn, nhưng cần job lúc 0h, dữ liệu sai trong khoảng giữa hai lần chạy, và mọi thao tác đổi hạn đều phải tính lại.
-- Lọc Quá hạn có phân trang: truy vấn `trangThai != HOAN_THANH` và `hanSapXep < homNayVN()`. `hanSapXep` bằng `hetHan`, hoặc `9999-12-31` nếu không có hạn. Đây vừa là khóa sắp xếp, vừa là khóa khoảng trong index `(congTyId, vai trò, deletedAt, hanSapXep, _id)`. Vì vậy `skip/limit` và `countDocuments` chạy trên index, không quét toàn bộ; có test `explain` khẳng định không có stage SORT hay COLLSCAN.
+- Lọc Quá hạn có phân trang: truy vấn `trangThai != HOAN_THANH` và `hanSapXep < todayInVietnam()`. `hanSapXep` bằng `hetHan`, hoặc `9999-12-31` nếu không có hạn. Đây vừa là khóa sắp xếp, vừa là khóa khoảng trong index `(congTyId, vai trò, deletedAt, hanSapXep, _id)`. Vì vậy `skip/limit` và `countDocuments` chạy trên index, không quét toàn bộ; có test `explain` khẳng định không có stage SORT hay COLLSCAN.
 
 **2. Mã CV không trùng, không nhảy số.**
 - Mỗi công ty có một bản ghi bộ đếm, tăng bằng `findOneAndUpdate({$inc})`. Lệnh này nguyên tử, nên hai người bấm cùng lúc luôn nhận hai số khác nhau.
@@ -130,7 +130,7 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 
 - **Nhẹ:** API không cần `tsx` hay bước build, vì Node ≥ 22.18 tự bỏ kiểu TS. tsconfig bật `erasableSyntaxOnly` để bảo đảm điều đó. Web tách chunk theo trang (`React.lazy`), không dùng thư viện UI, chỉ CSS thuần.
 - **Index:** 3 index danh sách theo vai trò, sắp theo ESR (bằng → sắp xếp → khoảng). "Tất cả" là `$or` của 3 nhánh, bộ lọc phụ đưa vào từng nhánh, nên Mongo dùng `SORT_MERGE` trên index thay vì sắp xếp trong bộ nhớ.
-- **Không ghi `undefined`:** `boUndefined` khi tạo; trong thay đổi, `null` nghĩa là `$unset`. Driver cũng bật `ignoreUndefined` làm lưới an toàn. Có test đọc thẳng document Mongo để kiểm tra.
+- **Không ghi `undefined`:** `stripUndefined` khi tạo; trong thay đổi, `null` nghĩa là `$unset`. Driver cũng bật `ignoreUndefined` làm lưới an toàn. Có test đọc thẳng document Mongo để kiểm tra.
 - **Kiểm thử:** 155 test. `unit/` gồm luật thuần, contracts, service với kho trong bộ nhớ, và việc con/bình luận. `integration/` là HTTP thật trên Mongo thật: quyền, dạng response, index (`explain`), transaction, đồng thời.
 
 ## Claude Code trong repo (`.claude/`)

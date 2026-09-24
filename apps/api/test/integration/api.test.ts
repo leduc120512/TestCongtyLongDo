@@ -1,21 +1,21 @@
 import type { FastifyInstance } from 'fastify'
 import { MongoClient, ObjectId, type Db } from 'mongodb'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { taoApp } from '../../src/app.ts'
-import { taoIndex, TEN_BANG } from '../../src/db/connection.ts'
-import { xayDungBoLoc, type CongViecDoc } from '../../src/repositories/task.repository.ts'
-import { taoKhoMongo } from '../../src/repositories/index.ts'
+import { buildApp } from '../../src/app.ts'
+import { createIndexes, COLLECTIONS } from '../../src/db/connection.ts'
+import { buildTaskFilter, type TaskDoc } from '../../src/repositories/task.repository.ts'
+import { createMongoStore } from '../../src/repositories/index.ts'
 
 /**
  * Test tích hợp: HTTP thật (app.inject) + MongoDB thật, DB riêng cho test.
  * Cần Mongo đang chạy (docker compose up -d). Không kết nối được thì bỏ qua và in cảnh báo.
  */
 
-const MONGO_GOC = process.env.MONGO_URL_TEST ?? 'mongodb://localhost:27017'
-const TEN_DB = `longdo_congviec_test_${process.pid}`
+const MONGO_BASE_URL = process.env.MONGO_URL_TEST ?? 'mongodb://localhost:27017'
+const DB_NAME = `longdo_congviec_test_${process.pid}`
 
-async function thuKetNoi(): Promise<MongoClient | null> {
-  const client = new MongoClient(`${MONGO_GOC}/${TEN_DB}?directConnection=true`, {
+async function tryConnect(): Promise<MongoClient | null> {
+  const client = new MongoClient(`${MONGO_BASE_URL}/${DB_NAME}?directConnection=true`, {
     serverSelectionTimeoutMS: 1500,
     ignoreUndefined: true,
   })
@@ -23,85 +23,85 @@ async function thuKetNoi(): Promise<MongoClient | null> {
     await client.connect()
     return client
   } catch {
-    console.warn(`⚠ Bỏ qua test tích hợp: không kết nối được MongoDB tại ${MONGO_GOC}`)
+    console.warn(`⚠ Bỏ qua test tích hợp: không kết nối được MongoDB tại ${MONGO_BASE_URL}`)
     return null
   }
 }
 
-const client = await thuKetNoi()
+const client = await tryConnect()
 
-const CT = new ObjectId()
-const CT_KHAC = new ObjectId()
+const COMPANY = new ObjectId()
+const OTHER_COMPANY = new ObjectId()
 const id = () => new ObjectId()
-const GIAO = id()
-const LAM = id()
-const XEM = id()
-const NGOAI = id()
-const NV_CT_KHAC = id()
-const DU_AN = id()
+const ASSIGNER = id()
+const ASSIGNEE = id()
+const FOLLOWER = id()
+const OUTSIDER = id()
+const OTHER_COMPANY_EMPLOYEE = id()
+const PROJECT = id()
 
 describe.skipIf(!client)('API tích hợp với MongoDB', () => {
   let db: Db
   let app: FastifyInstance
-  let coGiaoDich = false
-  let bayGio = new Date('2026-06-05T03:00:00Z')
+  let supportsTransactions = false
+  let now = new Date('2026-06-05T03:00:00Z')
   const token: Record<string, string> = {}
 
-  const goi = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, ai?: ObjectId, payload?: unknown) =>
+  const call = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, actor?: ObjectId, payload?: unknown) =>
     app.inject({
       method,
       url,
-      headers: ai ? { authorization: `Bearer ${token[ai.toHexString()]}` } : {},
+      headers: actor ? { authorization: `Bearer ${token[actor.toHexString()]}` } : {},
       ...(payload !== undefined ? { payload: payload as object } : {}),
     })
 
-  const taoViec = async (them: Record<string, unknown> = {}, ai = GIAO) => {
-    const res = await goi('POST', '/api/cong-viec', ai, {
+  const createTask = async (extra: Record<string, unknown> = {}, actor = ASSIGNER) => {
+    const res = await call('POST', '/api/cong-viec', actor, {
       ten: 'Nghiệm thu cọc khoan nhồi trụ T5',
-      nguoiThucHienIds: [LAM.toHexString()],
-      nguoiTheoDoiIds: [XEM.toHexString()],
-      duAnId: DU_AN.toHexString(),
+      nguoiThucHienIds: [ASSIGNEE.toHexString()],
+      nguoiTheoDoiIds: [FOLLOWER.toHexString()],
+      duAnId: PROJECT.toHexString(),
       uuTien: 'CAO',
       batDau: '2026-06-01',
       hetHan: '2026-06-10',
-      ...them,
+      ...extra,
     })
     expect(res.statusCode, res.body).toBe(201)
     return res.json().data
   }
 
   beforeAll(async () => {
-    db = client!.db(TEN_DB)
+    db = client!.db(DB_NAME)
     await db.dropDatabase()
-    await taoIndex(db)
-    await db.collection(TEN_BANG.nhanVien).insertMany([
-      { _id: GIAO, congTyId: CT, ten: 'Nguyễn Văn An', chucVu: 'Chỉ huy trưởng' },
-      { _id: LAM, congTyId: CT, ten: 'Lê Văn Cường', chucVu: 'Kỹ sư' },
-      { _id: XEM, congTyId: CT, ten: 'Vũ Thị Giang', chucVu: 'QA/QC' },
-      { _id: NGOAI, congTyId: CT, ten: 'Ngô Thị Nga', chucVu: 'Thư ký' },
-      { _id: NV_CT_KHAC, congTyId: CT_KHAC, ten: 'Người công ty khác', chucVu: 'Kỹ sư' },
+    await createIndexes(db)
+    await db.collection(COLLECTIONS.employees).insertMany([
+      { _id: ASSIGNER, congTyId: COMPANY, ten: 'Nguyễn Văn An', chucVu: 'Chỉ huy trưởng' },
+      { _id: ASSIGNEE, congTyId: COMPANY, ten: 'Lê Văn Cường', chucVu: 'Kỹ sư' },
+      { _id: FOLLOWER, congTyId: COMPANY, ten: 'Vũ Thị Giang', chucVu: 'QA/QC' },
+      { _id: OUTSIDER, congTyId: COMPANY, ten: 'Ngô Thị Nga', chucVu: 'Thư ký' },
+      { _id: OTHER_COMPANY_EMPLOYEE, congTyId: OTHER_COMPANY, ten: 'Người công ty khác', chucVu: 'Kỹ sư' },
     ])
-    await db.collection(TEN_BANG.duAn).insertOne({ _id: DU_AN, congTyId: CT, ma: 'CNC', ten: 'Cầu Nam Căn' })
+    await db.collection(COLLECTIONS.projects).insertOne({ _id: PROJECT, congTyId: COMPANY, ma: 'CNC', ten: 'Cầu Nam Căn' })
     const hello = await db.admin().command({ hello: 1 })
-    coGiaoDich = Boolean(hello.setName)
-    app = await taoApp({
-      kho: taoKhoMongo(client!, db, coGiaoDich),
+    supportsTransactions = Boolean(hello.setName)
+    app = await buildApp({
+      store: createMongoStore(client!, db, supportsTransactions),
       jwtSecret: 'bi-mat-test',
-      dangNhapGiaLap: true,
-      dongHo: () => bayGio,
+      mockLogin: true,
+      clock: () => now,
     })
-    for (const nv of [GIAO, LAM, XEM, NGOAI, NV_CT_KHAC]) {
-      const res = await goi('POST', '/api/xac-thuc/dang-nhap-gia-lap', undefined, { userId: nv.toHexString() })
-      token[nv.toHexString()] = res.json().data.token
+    for (const employee of [ASSIGNER, ASSIGNEE, FOLLOWER, OUTSIDER, OTHER_COMPANY_EMPLOYEE]) {
+      const res = await call('POST', '/api/xac-thuc/dang-nhap-gia-lap', undefined, { userId: employee.toHexString() })
+      token[employee.toHexString()] = res.json().data.token
     }
   })
 
   beforeEach(async () => {
-    bayGio = new Date('2026-06-05T03:00:00Z')
-    await db.collection(TEN_BANG.congViec).deleteMany({})
-    await db.collection(TEN_BANG.lichSu).deleteMany({})
-    await db.collection(TEN_BANG.boDem).deleteMany({})
-    await db.collection(TEN_BANG.binhLuan).deleteMany({})
+    now = new Date('2026-06-05T03:00:00Z')
+    await db.collection(COLLECTIONS.tasks).deleteMany({})
+    await db.collection(COLLECTIONS.history).deleteMany({})
+    await db.collection(COLLECTIONS.counters).deleteMany({})
+    await db.collection(COLLECTIONS.comments).deleteMany({})
   })
 
   afterAll(async () => {
@@ -112,7 +112,7 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
 
   describe('xác thực và dạng response', () => {
     it('không có token → 401 { error: { code, message } }', async () => {
-      const res = await goi('GET', '/api/cong-viec')
+      const res = await call('GET', '/api/cong-viec')
       expect(res.statusCode).toBe(401)
       expect(res.json()).toEqual({ error: { code: 'KHONG_DANG_NHAP', message: expect.any(String) } })
     })
@@ -123,29 +123,29 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
     })
 
     it('token chứa congTyId lấy từ hồ sơ nhân viên', async () => {
-      const payload = app.jwt.decode<{ userId: string; congTyId: string }>(token[GIAO.toHexString()]!)
-      expect(payload).toMatchObject({ userId: GIAO.toHexString(), congTyId: CT.toHexString() })
+      const payload = app.jwt.decode<{ userId: string; congTyId: string }>(token[ASSIGNER.toHexString()]!)
+      expect(payload).toMatchObject({ userId: ASSIGNER.toHexString(), congTyId: COMPANY.toHexString() })
     })
 
     it('tắt đăng nhập giả lập (production): không tự cấp token, không lộ danh sách nhân viên', async () => {
-      const appThat = await taoApp({ kho: taoKhoMongo(client!, db, coGiaoDich), jwtSecret: 'bi-mat-test', dangNhapGiaLap: false })
+      const prodApp = await buildApp({ store: createMongoStore(client!, db, supportsTransactions), jwtSecret: 'bi-mat-test', mockLogin: false })
       try {
-        const dangNhap = await appThat.inject({
+        const loginRes = await prodApp.inject({
           method: 'POST',
           url: '/api/xac-thuc/dang-nhap-gia-lap',
-          payload: { userId: GIAO.toHexString() },
+          payload: { userId: ASSIGNER.toHexString() },
         })
-        expect(dangNhap.statusCode).toBe(404)
-        expect(dangNhap.json()).toEqual({ error: { code: 'KHONG_TIM_THAY', message: expect.any(String) } })
-        const ds = await appThat.inject({ method: 'GET', url: '/api/xac-thuc/nguoi-dung-gia-lap' })
-        expect(ds.statusCode).toBe(404)
+        expect(loginRes.statusCode).toBe(404)
+        expect(loginRes.json()).toEqual({ error: { code: 'KHONG_TIM_THAY', message: expect.any(String) } })
+        const mockUsersRes = await prodApp.inject({ method: 'GET', url: '/api/xac-thuc/nguoi-dung-gia-lap' })
+        expect(mockUsersRes.statusCode).toBe(404)
       } finally {
-        await appThat.close()
+        await prodApp.close()
       }
     })
 
     it('đường dẫn không tồn tại → 404 đúng dạng lỗi', async () => {
-      const res = await goi('GET', '/api/khong-co', GIAO)
+      const res = await call('GET', '/api/khong-co', ASSIGNER)
       expect(res.json()).toEqual({ error: { code: 'KHONG_TIM_THAY', message: expect.any(String) } })
     })
 
@@ -153,7 +153,7 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/cong-viec',
-        headers: { authorization: `Bearer ${token[GIAO.toHexString()]}`, 'content-type': 'application/json' },
+        headers: { authorization: `Bearer ${token[ASSIGNER.toHexString()]}`, 'content-type': 'application/json' },
         payload: '{sai',
       })
       expect(res.statusCode).toBe(400)
@@ -161,33 +161,33 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
     })
 
     it('chi tiết trả { data } với id là chuỗi, không lộ trường nội bộ', async () => {
-      const cv = await taoViec()
-      const res = await goi('GET', `/api/cong-viec/${cv.id}`, GIAO)
+      const task = await createTask()
+      const res = await call('GET', `/api/cong-viec/${task.id}`, ASSIGNER)
       const { data } = res.json()
       expect(typeof data.id).toBe('string')
-      expect(data.nguoiThucHienIds).toEqual([LAM.toHexString()])
-      for (const noiBo of ['_id', 'tuKhoa', 'hanSapXep', 'deletedAt', 'phienBan']) expect(data).not.toHaveProperty(noiBo)
+      expect(data.nguoiThucHienIds).toEqual([ASSIGNEE.toHexString()])
+      for (const internalField of ['_id', 'tuKhoa', 'hanSapXep', 'deletedAt', 'phienBan']) expect(data).not.toHaveProperty(internalField)
     })
 
     it('danh sách trả { data, meta: { page, limit, total } }', async () => {
-      await taoViec()
-      const res = await goi('GET', '/api/cong-viec?page=1&limit=5', GIAO)
+      await createTask()
+      const res = await call('GET', '/api/cong-viec?page=1&limit=5', ASSIGNER)
       expect(res.json()).toEqual({ data: [expect.any(Object)], meta: { page: 1, limit: 5, total: 1 } })
     })
   })
 
   describe('không tin dữ liệu client gửi', () => {
     it('bỏ qua congTyId, nguoiGiaoId, trangThai, tienDo, ma trong body', async () => {
-      const cv = await taoViec({
-        congTyId: CT_KHAC.toHexString(),
-        nguoiGiaoId: NGOAI.toHexString(),
+      const task = await createTask({
+        congTyId: OTHER_COMPANY.toHexString(),
+        nguoiGiaoId: OUTSIDER.toHexString(),
         trangThai: 'HOAN_THANH',
         tienDo: 100,
         ma: 'CV-9999',
       })
-      expect(cv).toMatchObject({
-        congTyId: CT.toHexString(),
-        nguoiGiaoId: GIAO.toHexString(),
+      expect(task).toMatchObject({
+        congTyId: COMPANY.toHexString(),
+        nguoiGiaoId: ASSIGNER.toHexString(),
         trangThai: 'CHUA_BAT_DAU',
         tienDo: 0,
         ma: 'CV-0001',
@@ -195,17 +195,17 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
     })
 
     it('người công ty khác không thấy, không sửa, không xóa được', async () => {
-      const cv = await taoViec()
-      expect((await goi('GET', `/api/cong-viec/${cv.id}`, NV_CT_KHAC)).statusCode).toBe(404)
-      expect((await goi('PATCH', `/api/cong-viec/${cv.id}`, NV_CT_KHAC, { ten: 'x' })).statusCode).toBe(404)
-      expect((await goi('DELETE', `/api/cong-viec/${cv.id}`, NV_CT_KHAC)).statusCode).toBe(404)
-      expect((await goi('GET', '/api/cong-viec', NV_CT_KHAC)).json().meta.total).toBe(0)
+      const task = await createTask()
+      expect((await call('GET', `/api/cong-viec/${task.id}`, OTHER_COMPANY_EMPLOYEE)).statusCode).toBe(404)
+      expect((await call('PATCH', `/api/cong-viec/${task.id}`, OTHER_COMPANY_EMPLOYEE, { ten: 'x' })).statusCode).toBe(404)
+      expect((await call('DELETE', `/api/cong-viec/${task.id}`, OTHER_COMPANY_EMPLOYEE)).statusCode).toBe(404)
+      expect((await call('GET', '/api/cong-viec', OTHER_COMPANY_EMPLOYEE)).json().meta.total).toBe(0)
     })
 
     it('không giao việc được cho người công ty khác', async () => {
-      const res = await goi('POST', '/api/cong-viec', GIAO, {
+      const res = await call('POST', '/api/cong-viec', ASSIGNER, {
         ten: 'x',
-        nguoiThucHienIds: [NV_CT_KHAC.toHexString()],
+        nguoiThucHienIds: [OTHER_COMPANY_EMPLOYEE.toHexString()],
       })
       expect(res.statusCode).toBe(400)
     })
@@ -213,51 +213,51 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
 
   describe('API tự chặn theo vai trò (không dựa vào việc web ẩn nút)', () => {
     it('người thực hiện không sửa tên, hạn, người thực hiện → 403', async () => {
-      const cv = await taoViec()
-      for (const body of [{ ten: 'x' }, { hetHan: '2026-12-31' }, { nguoiThucHienIds: [LAM.toHexString(), XEM.toHexString()] }]) {
-        const res = await goi('PATCH', `/api/cong-viec/${cv.id}`, LAM, body)
+      const task = await createTask()
+      for (const body of [{ ten: 'x' }, { hetHan: '2026-12-31' }, { nguoiThucHienIds: [ASSIGNEE.toHexString(), FOLLOWER.toHexString()] }]) {
+        const res = await call('PATCH', `/api/cong-viec/${task.id}`, ASSIGNEE, body)
         expect(res.statusCode).toBe(403)
         expect(res.json().error.code).toBe('KHONG_CO_QUYEN')
       }
     })
 
     it('người theo dõi không đổi trạng thái, không cập nhật tiến độ, không xóa', async () => {
-      const cv = await taoViec()
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, XEM, { trangThai: 'DANG_LAM' })).statusCode).toBe(403)
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/tien-do`, XEM, { tienDo: 10 })).statusCode).toBe(403)
-      expect((await goi('DELETE', `/api/cong-viec/${cv.id}`, XEM)).statusCode).toBe(403)
+      const task = await createTask()
+      expect((await call('POST', `/api/cong-viec/${task.id}/trang-thai`, FOLLOWER, { trangThai: 'DANG_LAM' })).statusCode).toBe(403)
+      expect((await call('POST', `/api/cong-viec/${task.id}/tien-do`, FOLLOWER, { tienDo: 10 })).statusCode).toBe(403)
+      expect((await call('DELETE', `/api/cong-viec/${task.id}`, FOLLOWER)).statusCode).toBe(403)
     })
 
     it('người ngoài trong cùng công ty → 404', async () => {
-      const cv = await taoViec()
-      expect((await goi('GET', `/api/cong-viec/${cv.id}`, NGOAI)).statusCode).toBe(404)
-      expect((await goi('GET', `/api/cong-viec/${cv.id}/lich-su`, NGOAI)).statusCode).toBe(404)
+      const task = await createTask()
+      expect((await call('GET', `/api/cong-viec/${task.id}`, OUTSIDER)).statusCode).toBe(404)
+      expect((await call('GET', `/api/cong-viec/${task.id}/lich-su`, OUTSIDER)).statusCode).toBe(404)
     })
 
     it('đi hết luồng qua HTTP; HOAN_THANH thì không sửa, không xóa', async () => {
-      const cv = await taoViec()
-      const buoc = async (ai: ObjectId, body: object) => {
-        const res = await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, ai, body)
+      const task = await createTask()
+      const changeStatus = async (actor: ObjectId, body: object) => {
+        const res = await call('POST', `/api/cong-viec/${task.id}/trang-thai`, actor, body)
         expect(res.statusCode, res.body).toBe(200)
         return res.json().data
       }
-      await buoc(LAM, { trangThai: 'DANG_LAM' })
-      expect((await buoc(LAM, { trangThai: 'CHO_DUYET' })).tienDo).toBe(100)
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, GIAO, { trangThai: 'DANG_LAM' })).statusCode).toBe(400)
-      await buoc(GIAO, { trangThai: 'DANG_LAM', lyDo: 'Thiếu biên bản' })
-      await buoc(LAM, { trangThai: 'CHO_DUYET' })
-      const xong = await buoc(GIAO, { trangThai: 'HOAN_THANH' })
+      await changeStatus(ASSIGNEE, { trangThai: 'DANG_LAM' })
+      expect((await changeStatus(ASSIGNEE, { trangThai: 'CHO_DUYET' })).tienDo).toBe(100)
+      expect((await call('POST', `/api/cong-viec/${task.id}/trang-thai`, ASSIGNER, { trangThai: 'DANG_LAM' })).statusCode).toBe(400)
+      await changeStatus(ASSIGNER, { trangThai: 'DANG_LAM', lyDo: 'Thiếu biên bản' })
+      await changeStatus(ASSIGNEE, { trangThai: 'CHO_DUYET' })
+      const done = await changeStatus(ASSIGNER, { trangThai: 'HOAN_THANH' })
       // Hoàn thành là trạng thái cuối: không còn quyền thao tác nào.
-      expect(Object.values(xong.quyen).every((x) => x === false)).toBe(true)
-      expect((await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, { ten: 'x' })).statusCode).toBe(409)
-      expect((await goi('DELETE', `/api/cong-viec/${cv.id}`, GIAO)).statusCode).toBe(409)
+      expect(Object.values(done.quyen).every((x) => x === false)).toBe(true)
+      expect((await call('PATCH', `/api/cong-viec/${task.id}`, ASSIGNER, { ten: 'x' })).statusCode).toBe(409)
+      expect((await call('DELETE', `/api/cong-viec/${task.id}`, ASSIGNER)).statusCode).toBe(409)
     })
   })
 
   describe('lưu trữ Mongo', () => {
     it('không ghi trường undefined/null; tham chiếu lưu dạng ObjectId', async () => {
-      const cv = await taoViec({ duAnId: undefined, batDau: undefined, hetHan: undefined, moTa: undefined })
-      const doc = await db.collection(TEN_BANG.congViec).findOne({ _id: new ObjectId(cv.id) })
+      const task = await createTask({ duAnId: undefined, batDau: undefined, hetHan: undefined, moTa: undefined })
+      const doc = await db.collection(COLLECTIONS.tasks).findOne({ _id: new ObjectId(task.id) })
       expect(doc).not.toBeNull()
       for (const [k, v] of Object.entries(doc!)) {
         expect(v, `trường ${k}`).not.toBeUndefined()
@@ -269,89 +269,89 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
     })
 
     it('PATCH với null thì $unset trường, không để lại null', async () => {
-      const cv = await taoViec()
-      await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, { hetHan: null, duAnId: null, batDau: null })
-      const doc = await db.collection(TEN_BANG.congViec).findOne({ _id: new ObjectId(cv.id) })
+      const task = await createTask()
+      await call('PATCH', `/api/cong-viec/${task.id}`, ASSIGNER, { hetHan: null, duAnId: null, batDau: null })
+      const doc = await db.collection(COLLECTIONS.tasks).findOne({ _id: new ObjectId(task.id) })
       for (const k of ['hetHan', 'duAnId', 'batDau']) expect(doc).not.toHaveProperty(k)
     })
 
     it('xóa mềm: bản ghi còn, có deletedAt, biến khỏi danh sách', async () => {
-      const cv = await taoViec()
-      expect((await goi('DELETE', `/api/cong-viec/${cv.id}`, GIAO)).json()).toEqual({ data: { id: cv.id } })
-      const doc = await db.collection(TEN_BANG.congViec).findOne({ _id: new ObjectId(cv.id) })
+      const task = await createTask()
+      expect((await call('DELETE', `/api/cong-viec/${task.id}`, ASSIGNER)).json()).toEqual({ data: { id: task.id } })
+      const doc = await db.collection(COLLECTIONS.tasks).findOne({ _id: new ObjectId(task.id) })
       expect(doc!.deletedAt).toBeInstanceOf(Date)
-      expect((await goi('GET', '/api/cong-viec', GIAO)).json().meta.total).toBe(0)
+      expect((await call('GET', '/api/cong-viec', ASSIGNER)).json().meta.total).toBe(0)
     })
 
     it('20 yêu cầu tạo đồng thời: mã không trùng, liền nhau CV-0001..CV-0020', async () => {
-      const ds = await Promise.all(Array.from({ length: 20 }, () => taoViec()))
-      const ma = ds.map((x) => x.ma).sort()
-      expect(ma).toEqual(Array.from({ length: 20 }, (_, i) => `CV-${String(i + 1).padStart(4, '0')}`))
+      const created = await Promise.all(Array.from({ length: 20 }, () => createTask()))
+      const codes = created.map((x) => x.ma).sort()
+      expect(codes).toEqual(Array.from({ length: 20 }, (_, i) => `CV-${String(i + 1).padStart(4, '0')}`))
     })
 
     it('một lần PATCH đổi 5 trường → 1 bản ghi lịch sử', async () => {
-      const cv = await taoViec()
-      await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, {
+      const task = await createTask()
+      await call('PATCH', `/api/cong-viec/${task.id}`, ASSIGNER, {
         ten: 'Tên mới',
         moTa: 'Mô tả',
         uuTien: 'THAP',
         hetHan: '2026-06-30',
-        nguoiTheoDoiIds: [NGOAI.toHexString()],
+        nguoiTheoDoiIds: [OUTSIDER.toHexString()],
       })
-      const ls = (await goi('GET', `/api/cong-viec/${cv.id}/lich-su`, GIAO)).json().data
-      const sua = ls.filter((x: { hanhDong: string }) => x.hanhDong === 'SUA')
-      expect(sua).toHaveLength(1)
-      expect(sua[0].thayDoi).toHaveLength(5)
-      expect(await db.collection(TEN_BANG.lichSu).countDocuments({ congViecId: new ObjectId(cv.id) })).toBe(2)
+      const history = (await call('GET', `/api/cong-viec/${task.id}/lich-su`, ASSIGNER)).json().data
+      const edits = history.filter((x: { hanhDong: string }) => x.hanhDong === 'SUA')
+      expect(edits).toHaveLength(1)
+      expect(edits[0].thayDoi).toHaveLength(5)
+      expect(await db.collection(COLLECTIONS.history).countDocuments({ congViecId: new ObjectId(task.id) })).toBe(2)
     })
 
     it('truy vấn "Việc của tôi" dùng index, không quét toàn bộ collection', async () => {
       const plan = await db
-        .collection(TEN_BANG.congViec)
-        .find({ congTyId: CT, nguoiThucHienIds: LAM, deletedAt: { $exists: false } })
+        .collection(COLLECTIONS.tasks)
+        .find({ congTyId: COMPANY, nguoiThucHienIds: ASSIGNEE, deletedAt: { $exists: false } })
         .sort({ hanSapXep: 1, _id: 1 })
         .explain('queryPlanner')
-      const chuoi = JSON.stringify(plan.queryPlanner.winningPlan)
-      expect(chuoi).toContain('IXSCAN')
-      expect(chuoi).not.toContain('COLLSCAN')
-      expect(chuoi).not.toContain('"SORT"')
+      const planText = JSON.stringify(plan.queryPlanner.winningPlan)
+      expect(planText).toContain('IXSCAN')
+      expect(planText).not.toContain('COLLSCAN')
+      expect(planText).not.toContain('"SORT"')
     })
   })
 
   describe('danh sách: lọc, tìm, sắp xếp, phân trang', () => {
     beforeEach(async () => {
-      await taoViec({ ten: 'Nghiệm thu cọc T5', hetHan: '2026-06-01', batDau: '2026-05-01' })
-      await taoViec({ ten: 'Đổ bê tông bệ trụ T6', hetHan: '2026-06-03', batDau: '2026-05-01', uuTien: 'THAP' })
-      await taoViec({ ten: 'Việc chung không hạn', duAnId: undefined, hetHan: undefined, batDau: undefined })
-      await taoViec({ ten: 'Việc tương lai', hetHan: '2026-06-20' })
-      await taoViec({ ten: 'Việc LAM giao', nguoiThucHienIds: [GIAO.toHexString()], nguoiTheoDoiIds: [] }, LAM)
+      await createTask({ ten: 'Nghiệm thu cọc T5', hetHan: '2026-06-01', batDau: '2026-05-01' })
+      await createTask({ ten: 'Đổ bê tông bệ trụ T6', hetHan: '2026-06-03', batDau: '2026-05-01', uuTien: 'THAP' })
+      await createTask({ ten: 'Việc chung không hạn', duAnId: undefined, hetHan: undefined, batDau: undefined })
+      await createTask({ ten: 'Việc tương lai', hetHan: '2026-06-20' })
+      await createTask({ ten: 'Việc LAM giao', nguoiThucHienIds: [ASSIGNER.toHexString()], nguoiTheoDoiIds: [] }, ASSIGNEE)
     })
 
-    const ds = async (qs: string, ai = GIAO) => (await goi('GET', `/api/cong-viec?${qs}`, ai)).json()
+    const listTasks = async (qs: string, actor = ASSIGNER) => (await call('GET', `/api/cong-viec?${qs}`, actor)).json()
 
     it('lọc nhanh', async () => {
-      expect((await ds('nhanh=TOI_GIAO')).meta.total).toBe(4)
-      expect((await ds('nhanh=CUA_TOI')).meta.total).toBe(1)
-      expect((await ds('nhanh=THEO_DOI')).meta.total).toBe(0)
-      expect((await ds('nhanh=TAT_CA')).meta.total).toBe(5)
-      expect((await ds('nhanh=THEO_DOI', XEM)).meta.total).toBe(4)
+      expect((await listTasks('nhanh=TOI_GIAO')).meta.total).toBe(4)
+      expect((await listTasks('nhanh=CUA_TOI')).meta.total).toBe(1)
+      expect((await listTasks('nhanh=THEO_DOI')).meta.total).toBe(0)
+      expect((await listTasks('nhanh=TAT_CA')).meta.total).toBe(5)
+      expect((await listTasks('nhanh=THEO_DOI', FOLLOWER)).meta.total).toBe(4)
     })
 
     it('số đếm mỗi lọc nhanh, áp cùng bộ lọc phụ', async () => {
-      const res = await goi('GET', '/api/cong-viec/dem', GIAO)
+      const res = await call('GET', '/api/cong-viec/dem', ASSIGNER)
       expect(res.json()).toEqual({ data: { CUA_TOI: 1, TOI_GIAO: 4, THEO_DOI: 0, TAT_CA: 5 } })
-      const theoUuTien = await goi('GET', '/api/cong-viec/dem?uuTien=THAP', GIAO)
-      expect(theoUuTien.json().data.TAT_CA).toBe(1)
+      const byPriority = await call('GET', '/api/cong-viec/dem?uuTien=THAP', ASSIGNER)
+      expect(byPriority.json().data.TAT_CA).toBe(1)
     })
 
     it('lọc dự án và "Việc chung"', async () => {
-      expect((await ds('duAnId=CHUNG')).data.map((x: { ten: string }) => x.ten)).toEqual(['Việc chung không hạn'])
-      expect((await ds(`duAnId=${DU_AN.toHexString()}&nhanh=TOI_GIAO`)).meta.total).toBe(3)
+      expect((await listTasks('duAnId=CHUNG')).data.map((x: { ten: string }) => x.ten)).toEqual(['Việc chung không hạn'])
+      expect((await listTasks(`duAnId=${PROJECT.toHexString()}&nhanh=TOI_GIAO`)).meta.total).toBe(3)
     })
 
     it('lọc Quá hạn có phân trang ở server (hôm nay VN = 05/06)', async () => {
-      const t1 = await ds('trangThai=QUA_HAN&limit=1&page=1')
-      const t2 = await ds('trangThai=QUA_HAN&limit=1&page=2')
+      const t1 = await listTasks('trangThai=QUA_HAN&limit=1&page=1')
+      const t2 = await listTasks('trangThai=QUA_HAN&limit=1&page=2')
       expect(t1.meta.total).toBe(2)
       expect(t1.data[0].hetHan).toBe('2026-06-01')
       expect(t2.data[0].hetHan).toBe('2026-06-03')
@@ -359,36 +359,36 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
     })
 
     it('Quá hạn đổi đúng lúc 00:00 giờ VN', async () => {
-      bayGio = new Date('2026-06-03T16:59:59Z') // 23:59:59 VN 03/06
-      expect((await ds('trangThai=QUA_HAN')).meta.total).toBe(1)
-      bayGio = new Date('2026-06-03T17:00:00Z') // 00:00 VN 04/06
-      expect((await ds('trangThai=QUA_HAN')).meta.total).toBe(2)
+      now = new Date('2026-06-03T16:59:59Z') // 23:59:59 VN 03/06
+      expect((await listTasks('trangThai=QUA_HAN')).meta.total).toBe(1)
+      now = new Date('2026-06-03T17:00:00Z') // 00:00 VN 04/06
+      expect((await listTasks('trangThai=QUA_HAN')).meta.total).toBe(2)
     })
 
     it('tìm theo tên không dấu và theo mã', async () => {
-      expect((await ds('q=be tong')).data.map((x: { ten: string }) => x.ten)).toEqual(['Đổ bê tông bệ trụ T6'])
-      expect((await ds('q=NGHIEM')).meta.total).toBe(1)
-      expect((await ds('q=cv-0002')).data[0].ma).toBe('CV-0002')
-      expect((await ds('q=(.*')).meta.total).toBe(0) // ký tự regex được thoát, không lỗi
+      expect((await listTasks('q=be tong')).data.map((x: { ten: string }) => x.ten)).toEqual(['Đổ bê tông bệ trụ T6'])
+      expect((await listTasks('q=NGHIEM')).meta.total).toBe(1)
+      expect((await listTasks('q=cv-0002')).data[0].ma).toBe('CV-0002')
+      expect((await listTasks('q=(.*')).meta.total).toBe(0) // ký tự regex được thoát, không lỗi
     })
 
     it('sắp xếp theo hạn: tăng dần, việc không hạn nằm cuối', async () => {
-      const han = (await ds('sapXep=hetHan_asc')).data.map((x: { hetHan?: string }) => x.hetHan ?? null)
-      expect(han.at(-1)).toBeNull()
-      const coHan = han.filter(Boolean)
-      expect(coHan).toEqual([...coHan].sort())
+      const deadlines = (await listTasks('sapXep=hetHan_asc')).data.map((x: { hetHan?: string }) => x.hetHan ?? null)
+      expect(deadlines.at(-1)).toBeNull()
+      const withDeadline = deadlines.filter(Boolean)
+      expect(withDeadline).toEqual([...withDeadline].sort())
     })
 
     it('query sai → 400 tiếng Việt', async () => {
-      const res = await goi('GET', '/api/cong-viec?limit=1000', GIAO)
+      const res = await call('GET', '/api/cong-viec?limit=1000', ASSIGNER)
       expect(res.statusCode).toBe(400)
       expect(res.json().error.message).toContain('tối đa là 100')
     })
 
     it('hạn trước ngày bắt đầu → 400 tiếng Việt', async () => {
-      const res = await goi('POST', '/api/cong-viec', GIAO, {
+      const res = await call('POST', '/api/cong-viec', ASSIGNER, {
         ten: 'x',
-        nguoiThucHienIds: [LAM.toHexString()],
+        nguoiThucHienIds: [ASSIGNEE.toHexString()],
         batDau: '2026-06-10',
         hetHan: '2026-06-01',
       })
@@ -398,193 +398,193 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
   })
   describe('hồi quy sau review', () => {
     it('PATCH chỉ gửi {ten}: ưu tiên và người theo dõi giữ nguyên, lịch sử đúng 1 thay đổi', async () => {
-      const cv = await taoViec({ uuTien: 'CAO' })
-      const res = await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, { ten: 'Chỉ đổi tên' })
+      const task = await createTask({ uuTien: 'CAO' })
+      const res = await call('PATCH', `/api/cong-viec/${task.id}`, ASSIGNER, { ten: 'Chỉ đổi tên' })
       expect(res.statusCode, res.body).toBe(200)
-      expect(res.json().data).toMatchObject({ ten: 'Chỉ đổi tên', uuTien: 'CAO', nguoiTheoDoiIds: [XEM.toHexString()] })
-      expect((await goi('GET', `/api/cong-viec/${cv.id}`, XEM)).statusCode).toBe(200)
-      const ls = (await goi('GET', `/api/cong-viec/${cv.id}/lich-su`, GIAO)).json().data
-      const sua = ls.filter((x: { hanhDong: string }) => x.hanhDong === 'SUA')
-      expect(sua).toHaveLength(1)
-      expect(sua[0].thayDoi).toEqual([{ truong: 'ten', tu: 'Nghiệm thu cọc khoan nhồi trụ T5', den: 'Chỉ đổi tên' }])
+      expect(res.json().data).toMatchObject({ ten: 'Chỉ đổi tên', uuTien: 'CAO', nguoiTheoDoiIds: [FOLLOWER.toHexString()] })
+      expect((await call('GET', `/api/cong-viec/${task.id}`, FOLLOWER)).statusCode).toBe(200)
+      const history = (await call('GET', `/api/cong-viec/${task.id}/lich-su`, ASSIGNER)).json().data
+      const edits = history.filter((x: { hanhDong: string }) => x.hanhDong === 'SUA')
+      expect(edits).toHaveLength(1)
+      expect(edits[0].thayDoi).toEqual([{ truong: 'ten', tu: 'Nghiệm thu cọc khoan nhồi trụ T5', den: 'Chỉ đổi tên' }])
     })
 
     it('PATCH {hetHan: null} không đụng tới ưu tiên và người theo dõi', async () => {
-      const cv = await taoViec({ uuTien: 'CAO' })
-      const moi = (await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, { hetHan: null })).json().data
-      expect(moi.hetHan).toBeUndefined()
-      expect(moi).toMatchObject({ uuTien: 'CAO', nguoiTheoDoiIds: [XEM.toHexString()] })
+      const task = await createTask({ uuTien: 'CAO' })
+      const updated = (await call('PATCH', `/api/cong-viec/${task.id}`, ASSIGNER, { hetHan: null })).json().data
+      expect(updated.hetHan).toBeUndefined()
+      expect(updated).toMatchObject({ uuTien: 'CAO', nguoiTheoDoiIds: [FOLLOWER.toHexString()] })
     })
 
     it('tiến độ không nhận null, chuỗi rỗng, chuỗi số, boolean, số lẻ, ngoài 0..100', async () => {
-      const cv = await taoViec()
-      await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, { trangThai: 'DANG_LAM' })
-      await goi('POST', `/api/cong-viec/${cv.id}/tien-do`, LAM, { tienDo: 70 })
+      const task = await createTask()
+      await call('POST', `/api/cong-viec/${task.id}/trang-thai`, ASSIGNEE, { trangThai: 'DANG_LAM' })
+      await call('POST', `/api/cong-viec/${task.id}/tien-do`, ASSIGNEE, { tienDo: 70 })
       for (const tienDo of [null, '', '50', true, [50], 50.5, 101, -1]) {
-        const res = await goi('POST', `/api/cong-viec/${cv.id}/tien-do`, LAM, { tienDo })
+        const res = await call('POST', `/api/cong-viec/${task.id}/tien-do`, ASSIGNEE, { tienDo })
         expect(res.statusCode, JSON.stringify(tienDo)).toBe(400)
         expect(res.json().error.code).toBe('VALIDATION')
       }
-      expect((await goi('GET', `/api/cong-viec/${cv.id}`, LAM)).json().data.tienDo).toBe(70)
+      expect((await call('GET', `/api/cong-viec/${task.id}`, ASSIGNEE)).json().data.tienDo).toBe(70)
     })
 
     it('URL mã hóa sai và tham số quá dài vẫn trả đúng dạng { error: { code, message } }', async () => {
-      const sai = await goi('GET', '/api/cong-viec/%zz', GIAO)
-      expect(sai.statusCode).toBe(400)
-      expect(sai.json()).toEqual({ error: { code: 'VALIDATION', message: expect.any(String) } })
-      const dai = await goi('GET', `/api/cong-viec/${'a'.repeat(200)}`, GIAO)
-      expect(dai.json()).toEqual({ error: { code: expect.any(String), message: expect.any(String) } })
+      const badUrl = await call('GET', '/api/cong-viec/%zz', ASSIGNER)
+      expect(badUrl.statusCode).toBe(400)
+      expect(badUrl.json()).toEqual({ error: { code: 'VALIDATION', message: expect.any(String) } })
+      const tooLong = await call('GET', `/api/cong-viec/${'a'.repeat(200)}`, ASSIGNER)
+      expect(tooLong.json()).toEqual({ error: { code: expect.any(String), message: expect.any(String) } })
     })
 
     it('lỗi sai kiểu dữ liệu cũng báo tiếng Việt', async () => {
-      const cv = await taoViec()
-      const res = await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, ['khong-phai-object'])
+      const task = await createTask()
+      const res = await call('POST', `/api/cong-viec/${task.id}/trang-thai`, ASSIGNEE, ['khong-phai-object'])
       expect(res.statusCode).toBe(400)
       expect(res.json().error.message).not.toMatch(/Invalid input|expected/)
     })
 
     it('id viết hoa được chuẩn hóa: không bị coi là hai người khác nhau', async () => {
-      const hoa = LAM.toHexString().toUpperCase()
-      const cv = await taoViec({ nguoiThucHienIds: [hoa], nguoiTheoDoiIds: [LAM.toHexString(), XEM.toHexString()] })
-      expect(cv.nguoiThucHienIds).toEqual([LAM.toHexString()])
-      expect(cv.nguoiTheoDoiIds).toEqual([XEM.toHexString()])
-      await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, { nguoiThucHienIds: [hoa] })
-      const ls = (await goi('GET', `/api/cong-viec/${cv.id}/lich-su`, GIAO)).json().data
-      expect(ls.filter((x: { hanhDong: string }) => x.hanhDong === 'SUA')).toHaveLength(0)
+      const upperCaseId = ASSIGNEE.toHexString().toUpperCase()
+      const task = await createTask({ nguoiThucHienIds: [upperCaseId], nguoiTheoDoiIds: [ASSIGNEE.toHexString(), FOLLOWER.toHexString()] })
+      expect(task.nguoiThucHienIds).toEqual([ASSIGNEE.toHexString()])
+      expect(task.nguoiTheoDoiIds).toEqual([FOLLOWER.toHexString()])
+      await call('PATCH', `/api/cong-viec/${task.id}`, ASSIGNER, { nguoiThucHienIds: [upperCaseId] })
+      const history = (await call('GET', `/api/cong-viec/${task.id}/lich-su`, ASSIGNER)).json().data
+      expect(history.filter((x: { hanhDong: string }) => x.hanhDong === 'SUA')).toHaveLength(0)
     })
 
     it('id sai định dạng → 400', async () => {
-      expect((await goi('GET', '/api/cong-viec/khong-phai-id', GIAO)).statusCode).toBe(400)
-      expect((await goi('GET', '/api/cong-viec?duAnId=xyz', GIAO)).statusCode).toBe(400)
+      expect((await call('GET', '/api/cong-viec/khong-phai-id', ASSIGNER)).statusCode).toBe(400)
+      expect((await call('GET', '/api/cong-viec?duAnId=xyz', ASSIGNER)).statusCode).toBe(400)
     })
 
     it('"Tất cả" kèm bộ lọc phụ vẫn dùng 3 index vai trò và không sắp xếp trong bộ nhớ', async () => {
-      const col = db.collection<CongViecDoc>(TEN_BANG.congViec)
-      const boLocGoc = { congTyId: CT.toHexString(), userId: GIAO.toHexString(), homNay: '2026-06-05' }
-      const cacBoLoc = [
+      const col = db.collection<TaskDoc>(COLLECTIONS.tasks)
+      const baseFilter = { congTyId: COMPANY.toHexString(), userId: ASSIGNER.toHexString(), today: '2026-06-05' }
+      const filters = [
         { trangThai: 'DANG_LAM' as const },
         { trangThai: 'QUA_HAN' as const },
         { uuTien: 'CAO' as const },
         { duAnId: null },
         { q: 'coc' },
       ]
-      for (const phu of cacBoLoc) {
-        for (const nhanh of ['TAT_CA', 'CUA_TOI', 'TOI_GIAO', 'THEO_DOI'] as const) {
+      for (const extra of filters) {
+        for (const quickFilter of ['TAT_CA', 'CUA_TOI', 'TOI_GIAO', 'THEO_DOI'] as const) {
           const plan = await col
-            .find(xayDungBoLoc({ ...boLocGoc, ...phu }, nhanh))
+            .find(buildTaskFilter({ ...baseFilter, ...extra }, quickFilter))
             .sort({ hanSapXep: 1, _id: 1 })
             .limit(20)
             .explain('queryPlanner')
-          const chuoi = JSON.stringify(plan.queryPlanner.winningPlan)
-          const moTa = `${nhanh} + ${JSON.stringify(phu)}`
-          expect(chuoi, moTa).not.toContain('COLLSCAN')
-          expect(chuoi, moTa).not.toContain('"stage":"SORT"')
-          expect(chuoi, moTa).not.toContain('ma_duy_nhat_trong_cong_ty')
-          expect(chuoi, moTa).toMatch(/ds_viec_cua_toi|ds_viec_toi_giao|ds_dang_theo_doi/)
+          const planText = JSON.stringify(plan.queryPlanner.winningPlan)
+          const label = `${quickFilter} + ${JSON.stringify(extra)}`
+          expect(planText, label).not.toContain('COLLSCAN')
+          expect(planText, label).not.toContain('"stage":"SORT"')
+          expect(planText, label).not.toContain('ma_duy_nhat_trong_cong_ty')
+          expect(planText, label).toMatch(/ds_viec_cua_toi|ds_viec_toi_giao|ds_dang_theo_doi/)
         }
       }
     })
 
     it('truy vấn lịch sử dùng index, không sắp xếp trong bộ nhớ', async () => {
       const plan = await db
-        .collection(TEN_BANG.lichSu)
-        .find({ congTyId: CT, congViecId: new ObjectId() })
+        .collection(COLLECTIONS.history)
+        .find({ congTyId: COMPANY, congViecId: new ObjectId() })
         .sort({ luc: -1, _id: -1 })
         .explain('queryPlanner')
-      const chuoi = JSON.stringify(plan.queryPlanner.winningPlan)
-      expect(chuoi).toContain('IXSCAN')
-      expect(chuoi).not.toContain('"stage":"SORT"')
+      const planText = JSON.stringify(plan.queryPlanner.winningPlan)
+      expect(planText).toContain('IXSCAN')
+      expect(planText).not.toContain('"stage":"SORT"')
     })
 
     it('nhiều người cập nhật tiến độ cùng lúc: chuỗi lịch sử "từ → đến" luôn liền mạch', async () => {
-      const cv = await taoViec({ nguoiThucHienIds: [LAM.toHexString(), GIAO.toHexString()] })
-      await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, { trangThai: 'DANG_LAM' })
-      const kq = await Promise.all(
+      const task = await createTask({ nguoiThucHienIds: [ASSIGNEE.toHexString(), ASSIGNER.toHexString()] })
+      await call('POST', `/api/cong-viec/${task.id}/trang-thai`, ASSIGNEE, { trangThai: 'DANG_LAM' })
+      const results = await Promise.all(
         [10, 20, 30, 40, 50, 60].map((tienDo, i) =>
-          goi('POST', `/api/cong-viec/${cv.id}/tien-do`, i % 2 ? LAM : GIAO, { tienDo }),
+          call('POST', `/api/cong-viec/${task.id}/tien-do`, i % 2 ? ASSIGNEE : ASSIGNER, { tienDo }),
         ),
       )
-      for (const r of kq) expect([200, 409], r.body).toContain(r.statusCode)
-      const ls = (await goi('GET', `/api/cong-viec/${cv.id}/lich-su`, GIAO)).json().data
-      const cacBuoc = ls
+      for (const r of results) expect([200, 409], r.body).toContain(r.statusCode)
+      const history = (await call('GET', `/api/cong-viec/${task.id}/lich-su`, ASSIGNER)).json().data
+      const steps = history
         .filter((x: { hanhDong: string }) => x.hanhDong === 'CAP_NHAT_TIEN_DO')
         .reverse()
         .map((x: { thayDoi: Array<{ tu: number; den: number }> }) => x.thayDoi[0]!)
-      expect(cacBuoc.length).toBe(kq.filter((r) => r.statusCode === 200).length)
-      let truoc = 0
-      for (const buoc of cacBuoc) {
-        expect(buoc.tu).toBe(truoc)
-        truoc = buoc.den
+      expect(steps.length).toBe(results.filter((r) => r.statusCode === 200).length)
+      let previous = 0
+      for (const step of steps) {
+        expect(step.tu).toBe(previous)
+        previous = step.den
       }
-      expect((await goi('GET', `/api/cong-viec/${cv.id}`, GIAO)).json().data.tienDo).toBe(truoc)
+      expect((await call('GET', `/api/cong-viec/${task.id}`, ASSIGNER)).json().data.tienDo).toBe(previous)
     })
 
     it('ghi lịch sử lỗi thì cả thao tác được hoàn tác: không có việc "mồ côi", không nhảy số', async (ctx) => {
-      if (!coGiaoDich) ctx.skip()
-      const cv1 = await taoViec()
+      if (!supportsTransactions) ctx.skip()
+      const task1 = await createTask()
       // Buộc mọi lệnh ghi lịch sử thất bại.
       await db.command({
-        collMod: TEN_BANG.lichSu,
-        validator: { khongBaoGioCo: { $exists: true } },
+        collMod: COLLECTIONS.history,
+        validator: { fieldThatNeverExists: { $exists: true } },
         validationAction: 'error',
       })
       try {
-        const tao = await goi('POST', '/api/cong-viec', GIAO, { ten: 'Sẽ không được lưu', nguoiThucHienIds: [LAM.toHexString()] })
-        expect(tao.statusCode).toBe(500)
-        expect(tao.json().error.code).toBe('LOI_HE_THONG')
-        const sua = await goi('PATCH', `/api/cong-viec/${cv1.id}`, GIAO, { ten: 'Không được đổi' })
-        expect(sua.statusCode).toBe(500)
+        const createRes = await call('POST', '/api/cong-viec', ASSIGNER, { ten: 'Sẽ không được lưu', nguoiThucHienIds: [ASSIGNEE.toHexString()] })
+        expect(createRes.statusCode).toBe(500)
+        expect(createRes.json().error.code).toBe('LOI_HE_THONG')
+        const patchRes = await call('PATCH', `/api/cong-viec/${task1.id}`, ASSIGNER, { ten: 'Không được đổi' })
+        expect(patchRes.statusCode).toBe(500)
       } finally {
-        await db.command({ collMod: TEN_BANG.lichSu, validator: {}, validationLevel: 'off' })
+        await db.command({ collMod: COLLECTIONS.history, validator: {}, validationLevel: 'off' })
       }
-      expect(await db.collection(TEN_BANG.congViec).countDocuments()).toBe(1)
-      expect((await goi('GET', `/api/cong-viec/${cv1.id}`, GIAO)).json().data.ten).toBe(cv1.ten)
+      expect(await db.collection(COLLECTIONS.tasks).countDocuments()).toBe(1)
+      expect((await call('GET', `/api/cong-viec/${task1.id}`, ASSIGNER)).json().data.ten).toBe(task1.ten)
       // Lượt tăng bộ đếm của lần tạo thất bại đã được hoàn tác → việc tiếp theo là CV-0002, không phải CV-0003.
-      expect((await taoViec()).ma).toBe('CV-0002')
+      expect((await createTask()).ma).toBe('CV-0002')
     })
   })
   describe('tùy chọn: việc con và bình luận qua HTTP', () => {
     it('luồng việc con: thêm (201), đánh dấu, xóa; quyền và dạng response', async () => {
-      const cv = await taoViec()
-      const them = await goi('POST', `/api/cong-viec/${cv.id}/viec-con`, GIAO, { ten: 'Khoan cọc' })
-      expect(them.statusCode, them.body).toBe(201)
-      const vcId = them.json().data.viecCon[0].id
-      expect(typeof vcId).toBe('string')
-      await goi('POST', `/api/cong-viec/${cv.id}/viec-con`, GIAO, { ten: 'Đổ bê tông cọc' })
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/viec-con`, LAM, { ten: 'x' })).statusCode).toBe(403)
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/viec-con`, GIAO, { ten: '  ' })).statusCode).toBe(400)
+      const task = await createTask()
+      const addRes = await call('POST', `/api/cong-viec/${task.id}/viec-con`, ASSIGNER, { ten: 'Khoan cọc' })
+      expect(addRes.statusCode, addRes.body).toBe(201)
+      const subtaskId = addRes.json().data.viecCon[0].id
+      expect(typeof subtaskId).toBe('string')
+      await call('POST', `/api/cong-viec/${task.id}/viec-con`, ASSIGNER, { ten: 'Đổ bê tông cọc' })
+      expect((await call('POST', `/api/cong-viec/${task.id}/viec-con`, ASSIGNEE, { ten: 'x' })).statusCode).toBe(403)
+      expect((await call('POST', `/api/cong-viec/${task.id}/viec-con`, ASSIGNER, { ten: '  ' })).statusCode).toBe(400)
 
-      await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, { trangThai: 'DANG_LAM' })
-      const danhDau = await goi('POST', `/api/cong-viec/${cv.id}/viec-con/${vcId}/danh-dau`, LAM, { xong: true })
-      expect(danhDau.statusCode, danhDau.body).toBe(200)
-      expect(danhDau.json().data.tienDo).toBe(50)
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/viec-con/${vcId}/danh-dau`, LAM, { xong: 'có' })).statusCode).toBe(400)
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/viec-con/${vcId}/danh-dau`, XEM, { xong: false })).statusCode).toBe(403)
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/tien-do`, LAM, { tienDo: 90 })).statusCode).toBe(409)
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, { trangThai: 'CHO_DUYET' })).statusCode).toBe(409)
+      await call('POST', `/api/cong-viec/${task.id}/trang-thai`, ASSIGNEE, { trangThai: 'DANG_LAM' })
+      const markRes = await call('POST', `/api/cong-viec/${task.id}/viec-con/${subtaskId}/danh-dau`, ASSIGNEE, { xong: true })
+      expect(markRes.statusCode, markRes.body).toBe(200)
+      expect(markRes.json().data.tienDo).toBe(50)
+      expect((await call('POST', `/api/cong-viec/${task.id}/viec-con/${subtaskId}/danh-dau`, ASSIGNEE, { xong: 'có' })).statusCode).toBe(400)
+      expect((await call('POST', `/api/cong-viec/${task.id}/viec-con/${subtaskId}/danh-dau`, FOLLOWER, { xong: false })).statusCode).toBe(403)
+      expect((await call('POST', `/api/cong-viec/${task.id}/tien-do`, ASSIGNEE, { tienDo: 90 })).statusCode).toBe(409)
+      expect((await call('POST', `/api/cong-viec/${task.id}/trang-thai`, ASSIGNEE, { trangThai: 'CHO_DUYET' })).statusCode).toBe(409)
 
-      const vc2 = danhDau.json().data.viecCon[1].id
-      const xoa = await goi('DELETE', `/api/cong-viec/${cv.id}/viec-con/${vc2}`, GIAO)
-      expect(xoa.json().data).toMatchObject({ tienDo: 100, viecCon: [{ id: vcId, ten: 'Khoan cọc', xong: true }] })
+      const secondSubtaskId = markRes.json().data.viecCon[1].id
+      const removeRes = await call('DELETE', `/api/cong-viec/${task.id}/viec-con/${secondSubtaskId}`, ASSIGNER)
+      expect(removeRes.json().data).toMatchObject({ tienDo: 100, viecCon: [{ id: subtaskId, ten: 'Khoan cọc', xong: true }] })
 
-      const doc = await db.collection(TEN_BANG.congViec).findOne({ _id: new ObjectId(cv.id) })
-      expect(doc!.viecCon).toEqual([{ id: vcId, ten: 'Khoan cọc', xong: true }])
+      const doc = await db.collection(COLLECTIONS.tasks).findOne({ _id: new ObjectId(task.id) })
+      expect(doc!.viecCon).toEqual([{ id: subtaskId, ten: 'Khoan cọc', xong: true }])
     })
 
     it('bình luận: người liên quan viết/đọc, người ngoài và công ty khác nhận 404', async () => {
-      const cv = await taoViec()
-      const viet = await goi('POST', `/api/cong-viec/${cv.id}/binh-luan`, XEM, { noiDung: '  Cần biên bản có chữ ký TVGS  ' })
-      expect(viet.statusCode, viet.body).toBe(201)
-      expect(viet.json().data).toMatchObject({ nguoiVietId: XEM.toHexString(), noiDung: 'Cần biên bản có chữ ký TVGS' })
-      await goi('POST', `/api/cong-viec/${cv.id}/binh-luan`, LAM, { noiDung: 'Đã bổ sung' })
-      const ds = (await goi('GET', `/api/cong-viec/${cv.id}/binh-luan`, GIAO)).json()
-      expect(ds.data.map((b: { noiDung: string }) => b.noiDung)).toEqual(['Cần biên bản có chữ ký TVGS', 'Đã bổ sung'])
-      expect((await goi('GET', `/api/cong-viec/${cv.id}/binh-luan`, NGOAI)).statusCode).toBe(404)
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/binh-luan`, NV_CT_KHAC, { noiDung: 'x' })).statusCode).toBe(404)
-      expect((await goi('POST', `/api/cong-viec/${cv.id}/binh-luan`, GIAO, { noiDung: '' })).statusCode).toBe(400)
-      const luu = await db.collection(TEN_BANG.binhLuan).findOne({})
-      for (const [k, v] of Object.entries(luu!)) expect(v, k).not.toBeUndefined()
-      expect(luu!.congTyId).toBeInstanceOf(ObjectId)
+      const task = await createTask()
+      const postRes = await call('POST', `/api/cong-viec/${task.id}/binh-luan`, FOLLOWER, { noiDung: '  Cần biên bản có chữ ký TVGS  ' })
+      expect(postRes.statusCode, postRes.body).toBe(201)
+      expect(postRes.json().data).toMatchObject({ nguoiVietId: FOLLOWER.toHexString(), noiDung: 'Cần biên bản có chữ ký TVGS' })
+      await call('POST', `/api/cong-viec/${task.id}/binh-luan`, ASSIGNEE, { noiDung: 'Đã bổ sung' })
+      const comments = (await call('GET', `/api/cong-viec/${task.id}/binh-luan`, ASSIGNER)).json()
+      expect(comments.data.map((b: { noiDung: string }) => b.noiDung)).toEqual(['Cần biên bản có chữ ký TVGS', 'Đã bổ sung'])
+      expect((await call('GET', `/api/cong-viec/${task.id}/binh-luan`, OUTSIDER)).statusCode).toBe(404)
+      expect((await call('POST', `/api/cong-viec/${task.id}/binh-luan`, OTHER_COMPANY_EMPLOYEE, { noiDung: 'x' })).statusCode).toBe(404)
+      expect((await call('POST', `/api/cong-viec/${task.id}/binh-luan`, ASSIGNER, { noiDung: '' })).statusCode).toBe(400)
+      const stored = await db.collection(COLLECTIONS.comments).findOne({})
+      for (const [k, v] of Object.entries(stored!)) expect(v, k).not.toBeUndefined()
+      expect(stored!.congTyId).toBeInstanceOf(ObjectId)
     })
   })
 })

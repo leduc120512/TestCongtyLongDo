@@ -1,7 +1,7 @@
-import type { MaLoi } from '@longdo/contracts'
+import type { ErrorCode } from '@longdo/contracts'
 import type { z } from 'zod'
 
-const MA_HTTP: Record<MaLoi, number> = {
+const HTTP_STATUS: Record<ErrorCode, number> = {
   VALIDATION: 400,
   KHONG_DANG_NHAP: 401,
   KHONG_CO_QUYEN: 403,
@@ -13,38 +13,38 @@ const MA_HTTP: Record<MaLoi, number> = {
 }
 
 /** Lỗi nghiệp vụ có mã; error handler đổi thành { error: { code, message } }. */
-export class LoiNghiepVu extends Error {
-  readonly code: MaLoi
+export class DomainError extends Error {
+  readonly code: ErrorCode
 
-  constructor(code: MaLoi, message: string) {
+  constructor(code: ErrorCode, message: string) {
     super(message)
-    this.name = 'LoiNghiepVu'
+    this.name = 'DomainError'
     this.code = code
   }
 
   get httpStatus(): number {
-    return MA_HTTP[this.code]
+    return HTTP_STATUS[this.code]
   }
 }
 
 /** Bỏ các khóa có giá trị chuỗi rỗng trong query string (web gửi "" khi không chọn gì). */
-function boChuoiRong(duLieu: unknown): unknown {
-  if (!duLieu || typeof duLieu !== 'object' || Array.isArray(duLieu)) return duLieu
-  const kq: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(duLieu as Record<string, unknown>)) {
-    if (v !== '') kq[k] = v
+function dropEmptyStrings(data: unknown): unknown {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data
+  const result: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+    if (v !== '') result[k] = v
   }
-  return kq
+  return result
 }
 
-/** Validate bằng Zod; sai thì ném LoiNghiepVu VALIDATION với thông báo tiếng Việt. */
-export function kiemTra<S extends z.ZodType>(schema: S, duLieu: unknown, tuyChon?: { boRong?: boolean }): z.output<S> {
-  const kq = schema.safeParse(tuyChon?.boRong ? boChuoiRong(duLieu) : duLieu)
-  if (!kq.success) {
-    const thongBao = kq.error.issues
+/** Validate bằng Zod; sai thì ném DomainError VALIDATION với thông báo tiếng Việt. */
+export function validate<S extends z.ZodType>(schema: S, data: unknown, options?: { dropEmpty?: boolean }): z.output<S> {
+  const result = schema.safeParse(options?.dropEmpty ? dropEmptyStrings(data) : data)
+  if (!result.success) {
+    const message = result.error.issues
       .map((i) => (i.path.length ? `${i.path.join('.')}: ${i.message}` : i.message))
       .join('; ')
-    throw new LoiNghiepVu('VALIDATION', thongBao)
+    throw new DomainError('VALIDATION', message)
   }
-  return kq.data
+  return result.data
 }

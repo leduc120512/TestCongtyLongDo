@@ -2,7 +2,7 @@
  * Chuẩn hóa để tìm kiếm tiếng Việt không phân biệt dấu: "Nghiệm thu Đường" → "nghiem thu duong".
  * Lưu kèm bản ghi (trường tuKhoa) để truy vấn không phải bỏ dấu lúc chạy.
  */
-export function chuanHoaTimKiem(s: string): string {
+export function normalizeForSearch(s: string): string {
   return s
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -14,6 +14,6 @@ export function chuanHoaTimKiem(s: string): string {
 }
 
 /** Thoát ký tự đặc biệt để đưa chuỗi người dùng nhập vào RegExp an toàn. */
-export function thoatRegex(s: string): string {
+export function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

@@ -1,14 +1,14 @@
-import type { LocNhanh, LocTrangThai, SapXep, ThongKeNhanh, TrangThai, UuTien } from '@longdo/contracts'
+import type { QuickFilter, StatusFilter, SortOrder, QuickFilterCounts, TaskStatus, Priority } from '@longdo/contracts'
 import type {
-  BinhLuanBanGhi,
-  BinhLuanMoi,
-  CongViecBanGhi,
-  CongViecMoi,
-  DuAnBanGhi,
-  LichSuBanGhi,
-  LichSuMoi,
-  NhanVienBanGhi,
-  ThayDoiCongViec,
+  CommentRecord,
+  NewCommentRecord,
+  TaskRecord,
+  NewTask,
+  ProjectRecord,
+  HistoryRecord,
+  NewHistoryRecord,
+  EmployeeRecord,
+  TaskChanges,
 } from '../types.ts'
 
 /**
@@ -17,85 +17,85 @@ import type {
  * Mọi hàm đều nhận congTyId: không có truy vấn nào chạy mà không lọc theo công ty.
  */
 
-export type BoLocCongViec = {
+export type TaskFilter = {
   congTyId: string
   userId: string
   /** Ngày hôm nay theo giờ VN (YYYY-MM-DD), để lọc Quá hạn. */
-  homNay: string
+  today: string
   /** undefined = mọi dự án; null = chỉ việc chung; chuỗi = một dự án. */
   duAnId?: string | null
-  trangThai?: LocTrangThai
-  uuTien?: UuTien
+  trangThai?: StatusFilter
+  uuTien?: Priority
   /** Từ khóa người dùng gõ; repository tự chuẩn hóa (bỏ dấu, chữ thường). Tìm theo tên hoặc mã. */
   q?: string
 }
 
-export type DieuKienCapNhat = {
+export type UpdateCondition = {
   /** Chỉ cập nhật nếu trạng thái hiện tại đúng bằng giá trị này. */
-  trangThai?: TrangThai
+  trangThai?: TaskStatus
   /** Chỉ cập nhật nếu phiên bản vẫn là giá trị đã đọc (khóa lạc quan). Mỗi lần ghi tăng phiên bản 1. */
   phienBan?: number
 }
 
-export interface CongViecRepository {
+export interface TaskRepository {
   /** Tìm theo id trong công ty, bỏ qua bản ghi đã xóa mềm. */
-  timTheoId(congTyId: string, id: string): Promise<CongViecBanGhi | null>
-  tao(duLieu: CongViecMoi): Promise<CongViecBanGhi>
+  findById(congTyId: string, id: string): Promise<TaskRecord | null>
+  create(data: NewTask): Promise<TaskRecord>
   /** Cập nhật có điều kiện; trả null nếu không còn khớp điều kiện (đã bị người khác đổi). */
-  capNhat(
+  update(
     congTyId: string,
     id: string,
-    dieuKien: DieuKienCapNhat,
-    thayDoi: ThayDoiCongViec,
-    luc: Date,
-  ): Promise<CongViecBanGhi | null>
-  danhSach(
-    boLoc: BoLocCongViec & { nhanh: LocNhanh },
-    trang: { page: number; limit: number },
-    sapXep: SapXep,
-  ): Promise<{ items: CongViecBanGhi[]; total: number }>
-  demTheoLocNhanh(boLoc: BoLocCongViec): Promise<ThongKeNhanh>
+    condition: UpdateCondition,
+    changes: TaskChanges,
+    now: Date,
+  ): Promise<TaskRecord | null>
+  list(
+    filter: TaskFilter & { nhanh: QuickFilter },
+    paging: { page: number; limit: number },
+    sortOrder: SortOrder,
+  ): Promise<{ items: TaskRecord[]; total: number }>
+  countByQuickFilter(filter: TaskFilter): Promise<QuickFilterCounts>
 }
 
-export interface BoDemRepository {
+export interface CounterRepository {
   /** Lấy số thứ tự tiếp theo cho mã công việc của một công ty (nguyên tử). */
-  laySoTiepTheo(congTyId: string): Promise<number>
+  nextSequence(congTyId: string): Promise<number>
 }
 
-export interface LichSuRepository {
-  ghi(banGhi: LichSuMoi): Promise<void>
-  danhSach(congTyId: string, congViecId: string): Promise<LichSuBanGhi[]>
+export interface HistoryRepository {
+  add(record: NewHistoryRecord): Promise<void>
+  list(congTyId: string, congViecId: string): Promise<HistoryRecord[]>
 }
 
-export interface BinhLuanRepository {
-  ghi(banGhi: BinhLuanMoi): Promise<BinhLuanBanGhi>
+export interface CommentRepository {
+  add(record: NewCommentRecord): Promise<CommentRecord>
   /** Bình luận của một công việc, cũ trước mới sau. */
-  danhSach(congTyId: string, congViecId: string): Promise<BinhLuanBanGhi[]>
+  list(congTyId: string, congViecId: string): Promise<CommentRecord[]>
 }
 
-export interface NhanVienRepository {
-  danhSach(congTyId: string): Promise<NhanVienBanGhi[]>
+export interface EmployeeRepository {
+  list(congTyId: string): Promise<EmployeeRecord[]>
   /** Tất cả nhân viên mọi công ty, chỉ dùng cho màn chọn "Đang đăng nhập là ai". */
-  danhSachGiaLap(): Promise<NhanVienBanGhi[]>
-  timTheoId(id: string): Promise<NhanVienBanGhi | null>
-  timNhieu(congTyId: string, ids: readonly string[]): Promise<NhanVienBanGhi[]>
+  listForMockLogin(): Promise<EmployeeRecord[]>
+  findById(id: string): Promise<EmployeeRecord | null>
+  findMany(congTyId: string, ids: readonly string[]): Promise<EmployeeRecord[]>
 }
 
-export interface DuAnRepository {
-  danhSach(congTyId: string): Promise<DuAnBanGhi[]>
-  timTheoId(congTyId: string, id: string): Promise<DuAnBanGhi | null>
+export interface ProjectRepository {
+  list(congTyId: string): Promise<ProjectRecord[]>
+  findById(congTyId: string, id: string): Promise<ProjectRecord | null>
 }
 
-export type KhoDuLieu = {
-  congViec: CongViecRepository
-  boDem: BoDemRepository
-  lichSu: LichSuRepository
-  binhLuan: BinhLuanRepository
-  nhanVien: NhanVienRepository
-  duAn: DuAnRepository
+export type DataStore = {
+  tasks: TaskRepository
+  counters: CounterRepository
+  history: HistoryRepository
+  comments: CommentRepository
+  employees: EmployeeRepository
+  projects: ProjectRepository
   /**
    * Chạy nhiều thao tác ghi như một khối: hoặc tất cả được lưu, hoặc không gì cả
    * (ghi công việc + ghi lịch sử + tăng bộ đếm mã). fn nhận một kho gắn với giao dịch đó.
    */
-  giaoDich<T>(fn: (kho: KhoDuLieu) => Promise<T>): Promise<T>
+  transaction<T>(fn: (store: DataStore) => Promise<T>): Promise<T>
 }

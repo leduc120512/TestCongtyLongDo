@@ -1,170 +1,170 @@
-import type { LocNhanh, SapXep, ThongKeNhanh } from '@longdo/contracts'
+import type { QuickFilter, SortOrder, QuickFilterCounts } from '@longdo/contracts'
 import type {
-  BinhLuanBanGhi,
-  CongViecBanGhi,
-  CongViecMoi,
-  DuAnBanGhi,
-  LichSuBanGhi,
-  LichSuMoi,
-  NhanVienBanGhi,
-  ThayDoiCongViec,
+  CommentRecord,
+  TaskRecord,
+  NewTask,
+  ProjectRecord,
+  HistoryRecord,
+  NewHistoryRecord,
+  EmployeeRecord,
+  TaskChanges,
 } from '../../src/types.ts'
 import type {
-  BoLocCongViec,
-  CongViecRepository,
-  DieuKienCapNhat,
-  KhoDuLieu,
+  TaskFilter,
+  TaskRepository,
+  UpdateCondition,
+  DataStore,
 } from '../../src/repositories/interfaces.ts'
-import { chuanHoaTimKiem } from '../../src/repositories/search.ts'
+import { normalizeForSearch } from '../../src/repositories/search.ts'
 
 /**
  * Kho dữ liệu trong bộ nhớ, cài đặt đúng các giao diện repository. Dùng để test nghiệp vụ và quyền
  * ở tầng service mà không cần Mongo. Hành vi Mongo thật được kiểm ở test tích hợp.
  */
 
-let dem = 0
-export const taoId = () => (++dem).toString(16).padStart(24, 'a')
+let idCounter = 0
+export const newId = () => (++idCounter).toString(16).padStart(24, 'a')
 
-class CongViecBoNho implements CongViecRepository {
-  readonly ds = new Map<string, CongViecBanGhi>()
+class MemoryTaskRepository implements TaskRepository {
+  readonly items = new Map<string, TaskRecord>()
 
-  async timTheoId(congTyId: string, id: string) {
-    const cv = this.ds.get(id)
-    return cv && cv.congTyId === congTyId && !cv.deletedAt ? structuredClone(cv) : null
+  async findById(congTyId: string, id: string) {
+    const task = this.items.get(id)
+    return task && task.congTyId === congTyId && !task.deletedAt ? structuredClone(task) : null
   }
 
-  async tao(duLieu: CongViecMoi) {
-    if ([...this.ds.values()].some((x) => x.congTyId === duLieu.congTyId && x.ma === duLieu.ma)) {
+  async create(data: NewTask) {
+    if ([...this.items.values()].some((x) => x.congTyId === data.congTyId && x.ma === data.ma)) {
       throw new Error('trùng mã')
     }
-    const cv = { ...duLieu, id: taoId() }
-    this.ds.set(cv.id, structuredClone(cv))
-    return cv
+    const task = { ...data, id: newId() }
+    this.items.set(task.id, structuredClone(task))
+    return task
   }
 
-  async capNhat(congTyId: string, id: string, dk: DieuKienCapNhat, thayDoi: ThayDoiCongViec, luc: Date) {
-    const cv = this.ds.get(id)
-    if (!cv || cv.congTyId !== congTyId || cv.deletedAt) return null
-    if (dk.trangThai && cv.trangThai !== dk.trangThai) return null
-    if (dk.phienBan !== undefined && cv.phienBan !== dk.phienBan) return null
-    const moi: Record<string, unknown> = { ...cv, capNhatLuc: luc, phienBan: cv.phienBan + 1 }
-    for (const [k, v] of Object.entries(thayDoi)) {
+  async update(congTyId: string, id: string, condition: UpdateCondition, changes: TaskChanges, now: Date) {
+    const task = this.items.get(id)
+    if (!task || task.congTyId !== congTyId || task.deletedAt) return null
+    if (condition.trangThai && task.trangThai !== condition.trangThai) return null
+    if (condition.phienBan !== undefined && task.phienBan !== condition.phienBan) return null
+    const updated: Record<string, unknown> = { ...task, capNhatLuc: now, phienBan: task.phienBan + 1 }
+    for (const [k, v] of Object.entries(changes)) {
       if (v === undefined) continue
-      if (v === null) delete moi[k]
-      else moi[k] = v
+      if (v === null) delete updated[k]
+      else updated[k] = v
     }
-    this.ds.set(id, moi as CongViecBanGhi)
-    return structuredClone(moi as CongViecBanGhi)
+    this.items.set(id, updated as TaskRecord)
+    return structuredClone(updated as TaskRecord)
   }
 
-  private loc(b: BoLocCongViec, nhanh: LocNhanh) {
-    const tuKhoa = b.q ? chuanHoaTimKiem(b.q) : ''
-    return [...this.ds.values()].filter((cv) => {
-      if (cv.congTyId !== b.congTyId || cv.deletedAt) return false
-      const th = cv.nguoiThucHienIds.includes(b.userId)
-      const g = cv.nguoiGiaoId === b.userId
-      const td = cv.nguoiTheoDoiIds.includes(b.userId)
-      const theoNhanh = { CUA_TOI: th, TOI_GIAO: g, THEO_DOI: td, TAT_CA: th || g || td }[nhanh]
-      if (!theoNhanh) return false
-      if (b.duAnId === null && cv.duAnId) return false
-      if (b.duAnId && cv.duAnId !== b.duAnId) return false
-      if (b.trangThai === 'QUA_HAN') {
-        if (cv.trangThai === 'HOAN_THANH' || !cv.hetHan || cv.hetHan >= b.homNay) return false
-      } else if (b.trangThai && cv.trangThai !== b.trangThai) return false
-      if (b.uuTien && cv.uuTien !== b.uuTien) return false
-      if (tuKhoa && !chuanHoaTimKiem(cv.ten).includes(tuKhoa) && !cv.ma.toLowerCase().includes(tuKhoa)) return false
+  private match(filter: TaskFilter, quickFilter: QuickFilter) {
+    const keyword = filter.q ? normalizeForSearch(filter.q) : ''
+    return [...this.items.values()].filter((task) => {
+      if (task.congTyId !== filter.congTyId || task.deletedAt) return false
+      const isAssignee = task.nguoiThucHienIds.includes(filter.userId)
+      const isAssigner = task.nguoiGiaoId === filter.userId
+      const isFollower = task.nguoiTheoDoiIds.includes(filter.userId)
+      const matches = { CUA_TOI: isAssignee, TOI_GIAO: isAssigner, THEO_DOI: isFollower, TAT_CA: isAssignee || isAssigner || isFollower }[quickFilter]
+      if (!matches) return false
+      if (filter.duAnId === null && task.duAnId) return false
+      if (filter.duAnId && task.duAnId !== filter.duAnId) return false
+      if (filter.trangThai === 'QUA_HAN') {
+        if (task.trangThai === 'HOAN_THANH' || !task.hetHan || task.hetHan >= filter.today) return false
+      } else if (filter.trangThai && task.trangThai !== filter.trangThai) return false
+      if (filter.uuTien && task.uuTien !== filter.uuTien) return false
+      if (keyword && !normalizeForSearch(task.ten).includes(keyword) && !task.ma.toLowerCase().includes(keyword)) return false
       return true
     })
   }
 
-  async danhSach(b: BoLocCongViec & { nhanh: LocNhanh }, trang: { page: number; limit: number }, sapXep: SapXep) {
-    const huong = sapXep === 'hetHan_desc' ? -1 : 1
-    const khoa = (cv: CongViecBanGhi) => `${cv.hetHan ?? '9999-12-31'}|${cv.id}`
-    const tatCa = this.loc(b, b.nhanh).sort((x, y) => (khoa(x) < khoa(y) ? -huong : huong))
-    const batDau = (trang.page - 1) * trang.limit
-    return { items: tatCa.slice(batDau, batDau + trang.limit).map((x) => structuredClone(x)), total: tatCa.length }
+  async list(filter: TaskFilter & { nhanh: QuickFilter }, paging: { page: number; limit: number }, sortOrder: SortOrder) {
+    const direction = sortOrder === 'hetHan_desc' ? -1 : 1
+    const sortKey = (task: TaskRecord) => `${task.hetHan ?? '9999-12-31'}|${task.id}`
+    const all = this.match(filter, filter.nhanh).sort((x, y) => (sortKey(x) < sortKey(y) ? -direction : direction))
+    const start = (paging.page - 1) * paging.limit
+    return { items: all.slice(start, start + paging.limit).map((x) => structuredClone(x)), total: all.length }
   }
 
-  async demTheoLocNhanh(b: BoLocCongViec): Promise<ThongKeNhanh> {
+  async countByQuickFilter(filter: TaskFilter): Promise<QuickFilterCounts> {
     return {
-      CUA_TOI: this.loc(b, 'CUA_TOI').length,
-      TOI_GIAO: this.loc(b, 'TOI_GIAO').length,
-      THEO_DOI: this.loc(b, 'THEO_DOI').length,
-      TAT_CA: this.loc(b, 'TAT_CA').length,
+      CUA_TOI: this.match(filter, 'CUA_TOI').length,
+      TOI_GIAO: this.match(filter, 'TOI_GIAO').length,
+      THEO_DOI: this.match(filter, 'THEO_DOI').length,
+      TAT_CA: this.match(filter, 'TAT_CA').length,
     }
   }
 }
 
-export type KhoBoNho = KhoDuLieu & {
-  congViec: CongViecBoNho
-  lichSuDs: LichSuBanGhi[]
-  themNhanVien(nv: NhanVienBanGhi): void
-  themDuAn(da: DuAnBanGhi): void
+export type MemoryStore = DataStore & {
+  tasks: MemoryTaskRepository
+  historyRecords: HistoryRecord[]
+  addEmployee(employee: EmployeeRecord): void
+  addProject(project: ProjectRecord): void
 }
 
-export function taoKhoBoNho(): KhoBoNho {
-  const nhanVien: NhanVienBanGhi[] = []
-  const duAn: DuAnBanGhi[] = []
-  const lichSuDs: LichSuBanGhi[] = []
-  const binhLuanDs: BinhLuanBanGhi[] = []
-  const boDem = new Map<string, number>()
+export function createMemoryStore(): MemoryStore {
+  const employees: EmployeeRecord[] = []
+  const projects: ProjectRecord[] = []
+  const historyRecords: HistoryRecord[] = []
+  const commentRecords: CommentRecord[] = []
+  const counterValues = new Map<string, number>()
 
-  const kho: KhoBoNho = {
-    congViec: new CongViecBoNho(),
-    lichSuDs,
+  const store: MemoryStore = {
+    tasks: new MemoryTaskRepository(),
+    historyRecords,
     // Trong bộ nhớ không có giao dịch thật; test tính nguyên tử nằm ở test tích hợp Mongo.
-    giaoDich: (fn) => fn(kho),
-    themNhanVien: (nv) => nhanVien.push(nv),
-    themDuAn: (da) => duAn.push(da),
-    boDem: {
-      async laySoTiepTheo(congTyId) {
-        const so = (boDem.get(congTyId) ?? 0) + 1
-        boDem.set(congTyId, so)
-        return so
+    transaction: (fn) => fn(store),
+    addEmployee: (employee) => employees.push(employee),
+    addProject: (project) => projects.push(project),
+    counters: {
+      async nextSequence(congTyId) {
+        const seq = (counterValues.get(congTyId) ?? 0) + 1
+        counterValues.set(congTyId, seq)
+        return seq
       },
     },
-    lichSu: {
-      async ghi(ls: LichSuMoi) {
-        lichSuDs.push({ ...structuredClone(ls), id: taoId() })
+    history: {
+      async add(record: NewHistoryRecord) {
+        historyRecords.push({ ...structuredClone(record), id: newId() })
       },
-      async danhSach(congTyId, congViecId) {
-        return lichSuDs
+      async list(congTyId, congViecId) {
+        return historyRecords
           .filter((x) => x.congTyId === congTyId && x.congViecId === congViecId)
           .sort((a, b) => b.luc.getTime() - a.luc.getTime())
       },
     },
-    binhLuan: {
-      async ghi(bl) {
-        const moi = { ...structuredClone(bl), id: taoId() }
-        binhLuanDs.push(moi)
-        return moi
+    comments: {
+      async add(comment) {
+        const created = { ...structuredClone(comment), id: newId() }
+        commentRecords.push(created)
+        return created
       },
-      async danhSach(congTyId, congViecId) {
-        return binhLuanDs.filter((x) => x.congTyId === congTyId && x.congViecId === congViecId)
-      },
-    },
-    nhanVien: {
-      async danhSach(congTyId) {
-        return nhanVien.filter((x) => x.congTyId === congTyId)
-      },
-      async danhSachGiaLap() {
-        return [...nhanVien]
-      },
-      async timTheoId(id) {
-        return nhanVien.find((x) => x.id === id) ?? null
-      },
-      async timNhieu(congTyId, ids) {
-        return nhanVien.filter((x) => x.congTyId === congTyId && ids.includes(x.id))
+      async list(congTyId, congViecId) {
+        return commentRecords.filter((x) => x.congTyId === congTyId && x.congViecId === congViecId)
       },
     },
-    duAn: {
-      async danhSach(congTyId) {
-        return duAn.filter((x) => x.congTyId === congTyId)
+    employees: {
+      async list(congTyId) {
+        return employees.filter((x) => x.congTyId === congTyId)
       },
-      async timTheoId(congTyId, id) {
-        return duAn.find((x) => x.congTyId === congTyId && x.id === id) ?? null
+      async listForMockLogin() {
+        return [...employees]
+      },
+      async findById(id) {
+        return employees.find((x) => x.id === id) ?? null
+      },
+      async findMany(congTyId, ids) {
+        return employees.filter((x) => x.congTyId === congTyId && ids.includes(x.id))
+      },
+    },
+    projects: {
+      async list(congTyId) {
+        return projects.filter((x) => x.congTyId === congTyId)
+      },
+      async findById(congTyId, id) {
+        return projects.find((x) => x.congTyId === congTyId && x.id === id) ?? null
       },
     },
   }
-  return kho
+  return store
 }

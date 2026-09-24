@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url'
 
 const HOOK = fileURLToPath(new URL('./block-dangerous-actions.mjs', import.meta.url))
 const bash = (command) => ({ tool_name: 'Bash', tool_input: { command } })
-const doc = (file_path) => ({ tool_name: 'Read', tool_input: { file_path } })
+const read = (file_path) => ({ tool_name: 'Read', tool_input: { file_path } })
 
-const CA = [
+const CASES = [
   [bash('git reset --hard HEAD~1'), 2],
   [bash('git push origin main'), 2],
   [bash('git push -f origin main'), 2],
@@ -50,30 +50,30 @@ const CA = [
   [bash('git commit -m "chặn lệnh nguy hiểm và việc đọc/ghi file .env"'), 0],
   [bash('vi apps/api/.env'), 2],
   [bash('cp apps/api/.env.example apps/api/.env.example.bak'), 0],
-  [doc('C:\\repo\\apps\\api\\.env'), 2],
-  [doc('/repo/apps/api/.env.local'), 2],
+  [read('C:\\repo\\apps\\api\\.env'), 2],
+  [read('/repo/apps/api/.env.local'), 2],
   [{ tool_name: 'Edit', tool_input: { file_path: '/repo/.env' } }, 2],
   // Được phép
   [bash('cat apps/api/.env.example'), 0],
-  [bash('pnpm kiem-tra'), 0],
+  [bash('pnpm verify'), 0],
   [bash('git status --short'), 0],
   [bash('git commit -m "fix: sửa lọc quá hạn"'), 0],
   [bash('docker compose up -d'), 0],
-  [doc('/repo/apps/api/.env.example'), 0],
+  [read('/repo/apps/api/.env.example'), 0],
   [{ tool_name: 'Edit', tool_input: { file_path: '/repo/apps/api/src/app.ts' } }, 0],
 ]
 
-let sai = 0
-for (const [vao, mongDoi] of CA) {
-  const kq = spawnSync(process.execPath, [HOOK], { input: JSON.stringify(vao), encoding: 'utf8' })
-  const dat = kq.status === mongDoi
-  if (!dat) sai++
-  const moTa = vao.tool_input.command ?? `${vao.tool_name} ${vao.tool_input.file_path}`
-  console.log(`${dat ? 'ĐẠT ' : 'SAI '} ${mongDoi === 2 ? 'chặn' : 'cho '} ← ${moTa}`)
+let failures = 0
+for (const [testCase, expected] of CASES) {
+  const result = spawnSync(process.execPath, [HOOK], { input: JSON.stringify(testCase), encoding: 'utf8' })
+  const passed = result.status === expected
+  if (!passed) failures++
+  const label = testCase.tool_input.command ?? `${testCase.tool_name} ${testCase.tool_input.file_path}`
+  console.log(`${passed ? 'ĐẠT ' : 'SAI '} ${expected === 2 ? 'chặn' : 'cho '} ← ${label}`)
 }
-const hong = spawnSync(process.execPath, [HOOK], { input: 'không phải json', encoding: 'utf8' })
-if (hong.status !== 0) sai++
-console.log(`${hong.status === 0 ? 'ĐẠT ' : 'SAI '} cho  ← input không phải JSON`)
+const malformed = spawnSync(process.execPath, [HOOK], { input: 'không phải json', encoding: 'utf8' })
+if (malformed.status !== 0) failures++
+console.log(`${malformed.status === 0 ? 'ĐẠT ' : 'SAI '} cho  ← input không phải JSON`)
 
-console.log(sai ? `\n${sai} ca SAI` : `\nTất cả ${CA.length + 1} ca đạt`)
-process.exit(sai ? 1 : 0)
+console.log(failures ? `\n${failures} ca SAI` : `\nTất cả ${CASES.length + 1} ca đạt`)
+process.exit(failures ? 1 : 0)

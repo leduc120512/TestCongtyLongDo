@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 /** Ngày lịch (không có giờ), theo giờ Việt Nam, dạng YYYY-MM-DD. */
-export const NgaySchema = z
+export const CalendarDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày phải có dạng YYYY-MM-DD')
   .refine((s) => {
@@ -16,7 +16,7 @@ export const IdSchema = z
   .toLowerCase()
   .regex(/^[0-9a-f]{24}$/, 'Id không hợp lệ')
 
-export const PhanTrangQuerySchema = z.object({
+export const PaginationQuerySchema = z.object({
   page: z.coerce.number().int('Trang phải là số nguyên').min(1, 'Trang nhỏ nhất là 1').default(1),
   limit: z.coerce
     .number()
@@ -25,10 +25,10 @@ export const PhanTrangQuerySchema = z.object({
     .max(100, 'Số dòng tối đa là 100')
     .default(20),
 })
-export type PhanTrangQuery = z.infer<typeof PhanTrangQuerySchema>
+export type PaginationQuery = z.infer<typeof PaginationQuerySchema>
 
 /** Mã lỗi thống nhất trả về trong { error: { code, message } }. */
-export const MA_LOI = [
+export const ERROR_CODES = [
   'VALIDATION',
   'KHONG_DANG_NHAP',
   'KHONG_CO_QUYEN',
@@ -38,11 +38,11 @@ export const MA_LOI = [
   'XUNG_DOT',
   'LOI_HE_THONG',
 ] as const
-export type MaLoi = (typeof MA_LOI)[number]
+export type ErrorCode = (typeof ERROR_CODES)[number]
 
-export type PhanHoi<T> = { data: T }
-export type PhanHoiDanhSach<T> = {
+export type ApiResponse<T> = { data: T }
+export type ApiListResponse<T> = {
   data: T[]
   meta: { page: number; limit: number; total: number }
 }
-export type PhanHoiLoi = { error: { code: MaLoi; message: string } }
+export type ApiErrorResponse = { error: { code: ErrorCode; message: string } }
