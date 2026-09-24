@@ -1,10 +1,12 @@
-import type { QuyenCongViec } from '@longdo/contracts'
+import type { QuyenCongViec, TrangThai } from '@longdo/contracts'
+import { coTheQuanLyViecCon, soViecConChuaXong } from './viec-con.ts'
 
 type CongViecToiThieu = {
   nguoiGiaoId: string
   nguoiThucHienIds: string[]
   nguoiTheoDoiIds: string[]
-  trangThai: string
+  trangThai: TrangThai
+  viecCon?: ReadonlyArray<{ xong: boolean }>
 }
 
 export type VaiTro = {
@@ -15,7 +17,7 @@ export type VaiTro = {
   coLienQuan: boolean
 }
 
-export function xacDinhVaiTro(cv: CongViecToiThieu, userId: string): VaiTro {
+export function xacDinhVaiTro(cv: Omit<CongViecToiThieu, 'trangThai'>, userId: string): VaiTro {
   const laNguoiGiao = cv.nguoiGiaoId === userId
   const laNguoiThucHien = cv.nguoiThucHienIds.includes(userId)
   const laNguoiTheoDoi = cv.nguoiTheoDoiIds.includes(userId)
@@ -34,13 +36,19 @@ export function xacDinhVaiTro(cv: CongViecToiThieu, userId: string): VaiTro {
 export function tinhQuyen(cv: CongViecToiThieu, userId: string): QuyenCongViec {
   const vt = xacDinhVaiTro(cv, userId)
   const chuaXong = cv.trangThai !== 'HOAN_THANH'
+  const dangLam = cv.trangThai === 'DANG_LAM'
+  const viecCon = cv.viecCon ?? []
   return {
     sua: vt.laNguoiGiao && chuaXong,
     xoa: vt.laNguoiGiao && chuaXong,
     batDau: vt.laNguoiThucHien && cv.trangThai === 'CHUA_BAT_DAU',
-    guiDuyet: vt.laNguoiThucHien && cv.trangThai === 'DANG_LAM',
+    // Có việc con chưa xong thì chưa gửi duyệt được.
+    guiDuyet: vt.laNguoiThucHien && dangLam && soViecConChuaXong(viecCon) === 0,
     duyet: vt.laNguoiGiao && cv.trangThai === 'CHO_DUYET',
     traLai: vt.laNguoiGiao && cv.trangThai === 'CHO_DUYET',
-    capNhatTienDo: vt.laNguoiThucHien && cv.trangThai === 'DANG_LAM',
+    // Có việc con thì tiến độ tự tính, không nhập tay.
+    capNhatTienDo: vt.laNguoiThucHien && dangLam && viecCon.length === 0,
+    quanLyViecCon: vt.laNguoiGiao && coTheQuanLyViecCon(cv.trangThai),
+    danhDauViecCon: vt.laNguoiThucHien && dangLam,
   }
 }

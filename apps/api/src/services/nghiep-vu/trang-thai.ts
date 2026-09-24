@@ -1,5 +1,6 @@
 import { TEN_TRANG_THAI, type MaLoi, type TrangThai } from '@longdo/contracts'
 import { xacDinhVaiTro, type VaiTro } from './quyen.ts'
+import { soViecConChuaXong, tinhTienDo } from './viec-con.ts'
 
 type CongViecToiThieu = {
   nguoiGiaoId: string
@@ -7,6 +8,7 @@ type CongViecToiThieu = {
   nguoiTheoDoiIds: string[]
   trangThai: TrangThai
   tienDo: number
+  viecCon?: ReadonlyArray<{ xong: boolean }>
 }
 
 type BuocChuyen = {
@@ -78,7 +80,21 @@ export function xetChuyenTrangThai(
   if (buoc.canLyDo && !lyDo?.trim()) {
     return { ok: false, code: 'VALIDATION', message: 'Trả lại công việc phải ghi lý do' }
   }
+  const viecCon = cv.viecCon ?? []
+  const conLai = soViecConChuaXong(viecCon)
+  if (den === 'CHO_DUYET' && conLai > 0) {
+    return {
+      ok: false,
+      code: 'TRANG_THAI_KHONG_HOP_LE',
+      message: `Còn ${conLai} việc con chưa xong, chưa gửi duyệt được`,
+    }
+  }
   const capNhat: { trangThai: TrangThai; tienDo?: number } = { trangThai: den }
   if (den === 'CHO_DUYET') capNhat.tienDo = 100
+  else {
+    // Trả lại / bắt đầu: nếu có việc con thì tiến độ tính lại theo việc con.
+    const tienDoMoi = tinhTienDo(viecCon, den, cv.tienDo)
+    if (tienDoMoi !== cv.tienDo) capNhat.tienDo = tienDoMoi
+  }
   return { ok: true, capNhat }
 }

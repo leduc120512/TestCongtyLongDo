@@ -52,6 +52,8 @@ type ViecMau = {
   /** Trạng thái muốn đạt tới; seed đi đúng luồng để tới đó. */
   den?: TrangThai
   tienDo?: number
+  viecCon?: Array<{ ten: string; xong?: boolean }>
+  binhLuan?: Array<{ ai: string; noiDung: string }>
 }
 
 function danhSachViecMau(homNay: string): ViecMau[] {
@@ -62,12 +64,21 @@ function danhSachViecMau(homNay: string): ViecMau[] {
       viec: { ten: 'Nghiệm thu cọc khoan nhồi trụ T5', duAnId: CAU, nguoiThucHienIds: [CUONG, HUNG], nguoiTheoDoiIds: [GIANG], uuTien: 'CAO', batDau: n(-10), hetHan: n(-2), moTa: 'Nghiệm thu 12 cọc D1500 trụ T5, có mặt tư vấn giám sát.' },
       den: 'DANG_LAM',
       tienDo: 70,
+      binhLuan: [
+        { ai: GIANG, noiDung: 'Cọc T5-07 cần siêu âm lại, kết quả lần 1 chưa đạt.' },
+        { ai: CUONG, noiDung: 'Đã hẹn đơn vị thí nghiệm sáng thứ Hai.' },
+      ],
     },
     {
       nguoiGiao: AN,
       viec: { ten: 'Đổ bê tông bệ trụ T6', duAnId: CAU, nguoiThucHienIds: [HUNG], nguoiTheoDoiIds: [CUONG, LAN], uuTien: 'CAO', batDau: n(-3), hetHan: n(4) },
       den: 'DANG_LAM',
-      tienDo: 30,
+      viecCon: [
+        { ten: 'Lắp dựng ván khuôn', xong: true },
+        { ten: 'Lắp dựng cốt thép', xong: true },
+        { ten: 'Đổ bê tông M300' },
+        { ten: 'Bảo dưỡng bê tông 7 ngày' },
+      ],
     },
     {
       nguoiGiao: AN,
@@ -88,6 +99,8 @@ function danhSachViecMau(homNay: string): ViecMau[] {
     {
       nguoiGiao: BINH,
       viec: { ten: 'Kéo dây cáp ngầm tuyến 22kV Linh Đàm', duAnId: DIEN, nguoiThucHienIds: [MINH, DUNG], hetHan: n(14) },
+      viecCon: [{ ten: 'Đào rãnh cáp' }, { ten: 'Rải cáp và đấu nối' }, { ten: 'Hoàn trả mặt bằng' }],
+      binhLuan: [{ ai: BINH, noiDung: 'Xin giấy phép đào đường trước ngày 15.' }],
     },
     {
       nguoiGiao: BINH,
@@ -163,12 +176,23 @@ async function main() {
       const giao: NguoiDung = { userId: mau.nguoiGiao, congTyId: CONG_TY_ID }
       const thucHien: NguoiDung = { userId: mau.viec.nguoiThucHienIds[0]!, congTyId: CONG_TY_ID }
       const cv = await service.tao(giao, { nguoiTheoDoiIds: [], uuTien: 'BINH_THUONG', ...mau.viec })
+      let viecCon = cv.viecCon
+      for (const vc of mau.viecCon ?? []) viecCon = (await service.themViecCon(giao, cv.id, { ten: vc.ten })).viecCon
       for (const buoc of DUONG_DI[mau.den ?? 'CHUA_BAT_DAU']) {
         const nguoi = buoc === 'HOAN_THANH' ? giao : thucHien
         await service.chuyenTrangThai(nguoi, cv.id, { trangThai: buoc })
-        if (buoc === 'DANG_LAM' && mau.tienDo !== undefined && mau.den === 'DANG_LAM') {
-          await service.capNhatTienDo(thucHien, cv.id, { tienDo: mau.tienDo })
+        if (buoc === 'DANG_LAM') {
+          // Đánh dấu việc con đã xong (phải xong hết thì mới gửi duyệt được).
+          for (const [i, vc] of (mau.viecCon ?? []).entries()) {
+            if (vc.xong) await service.danhDauViecCon(thucHien, cv.id, viecCon[i]!.id, { xong: true })
+          }
+          if (mau.tienDo !== undefined && mau.den === 'DANG_LAM') {
+            await service.capNhatTienDo(thucHien, cv.id, { tienDo: mau.tienDo })
+          }
         }
+      }
+      for (const bl of mau.binhLuan ?? []) {
+        await service.vietBinhLuan({ userId: bl.ai, congTyId: CONG_TY_ID }, cv.id, { noiDung: bl.noiDung })
       }
     }
 

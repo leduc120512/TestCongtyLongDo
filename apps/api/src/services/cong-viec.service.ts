@@ -1,6 +1,13 @@
+import { randomBytes } from 'node:crypto'
 import {
   DU_AN_CHUNG,
+  SO_VIEC_CON_TOI_DA,
   hanHopLe,
+  type BinhLuan,
+  type DanhDauViecCon,
+  type ThemViecCon,
+  type ViecCon,
+  type VietBinhLuan,
   type CapNhatTienDo,
   type ChiTietCongViec,
   type ChuyenTrangThai,
@@ -23,6 +30,7 @@ import { tinhQuyen, xacDinhVaiTro } from './nghiep-vu/quyen.ts'
 import { soSanhTruong } from './nghiep-vu/so-sanh.ts'
 import { homNayVN, laQuaHan } from './nghiep-vu/thoi-gian.ts'
 import { xetChuyenTrangThai } from './nghiep-vu/trang-thai.ts'
+import { coTheQuanLyViecCon, tinhTienDo } from './nghiep-vu/viec-con.ts'
 
 const LOI_KHONG_THAY = 'Không tìm thấy công việc'
 const LOI_XUNG_DOT = 'Công việc vừa được người khác cập nhật, vui lòng tải lại rồi thử lại'
@@ -118,6 +126,7 @@ export class CongViecService {
         hetHan: body.hetHan || undefined,
         trangThai: 'CHUA_BAT_DAU' as const,
         tienDo: 0,
+        viecCon: [],
         phienBan: 0,
         taoLuc: luc,
         capNhatLuc: luc,
@@ -214,6 +223,9 @@ export class CongViecService {
     if (cv.trangThai !== 'DANG_LAM') {
       throw new LoiNghiepVu('TRANG_THAI_KHONG_HOP_LE', 'Chỉ cập nhật được tiến độ khi công việc đang làm')
     }
+    if (cv.viecCon.length > 0) {
+      throw new LoiNghiepVu('TRANG_THAI_KHONG_HOP_LE', 'Công việc có việc con: tiến độ được tính tự động theo việc con')
+    }
     if (body.tienDo === cv.tienDo) return sangChiTiet(cv, nd.userId, this.dongHo())
 
     const luc = this.dongHo()
@@ -240,7 +252,109 @@ export class CongViecService {
     return { id }
   }
 
+  // ---------- Việc con ----------
+
+  /** Người giao thêm việc con khi việc chưa bắt đầu hoặc đang làm. Tiến độ tính lại ngay. */
+  async themViecCon(nd: NguoiDung, id: string, body: ThemViecCon): Promise<ChiTietCongViec> {
+    const cv = await this.layViecDuocXem(nd, id)
+    this.kiemTraQuanLyViecCon(cv, nd.userId)
+    if (cv.viecCon.length >= SO_VIEC_CON_TOI_DA) {
+      throw new LoiNghiepVu('VALIDATION', `Tối đa ${SO_VIEC_CON_TOI_DA} việc con cho một công việc`)
+    }
+    const moi: ViecCon = { id: randomBytes(12).toString('hex'), ten: body.ten, xong: false }
+    return this.ghiViecCon(nd, cv, [...cv.viecCon, moi], { truong: 'viecCon', tu: null, den: { ten: moi.ten, xong: false } })
+  }
+
+  /** Người thực hiện đánh dấu xong/chưa xong khi việc đang làm. */
+  async danhDauViecCon(nd: NguoiDung, id: string, viecConId: string, body: DanhDauViecCon): Promise<ChiTietCongViec> {
+    const cv = await this.layViecDuocXem(nd, id)
+    if (!xacDinhVaiTro(cv, nd.userId).laNguoiThucHien) {
+      throw new LoiNghiepVu('KHONG_CO_QUYEN', 'Chỉ người thực hiện mới được đánh dấu việc con')
+    }
+    if (cv.trangThai !== 'DANG_LAM') {
+      throw new LoiNghiepVu('TRANG_THAI_KHONG_HOP_LE', 'Chỉ đánh dấu được việc con khi công việc đang làm')
+    }
+    const vc = this.timViecCon(cv, viecConId)
+    if (vc.xong === body.xong) return sangChiTiet(cv, nd.userId, this.dongHo())
+    const ds = cv.viecCon.map((x) => (x.id === vc.id ? { ...x, xong: body.xong } : x))
+    return this.ghiViecCon(nd, cv, ds, {
+      truong: 'viecCon',
+      tu: { ten: vc.ten, xong: vc.xong },
+      den: { ten: vc.ten, xong: body.xong },
+    })
+  }
+
+  /** Người giao xóa việc con khi việc chưa bắt đầu hoặc đang làm. */
+  async xoaViecCon(nd: NguoiDung, id: string, viecConId: string): Promise<ChiTietCongViec> {
+    const cv = await this.layViecDuocXem(nd, id)
+    this.kiemTraQuanLyViecCon(cv, nd.userId)
+    const vc = this.timViecCon(cv, viecConId)
+    return this.ghiViecCon(
+      nd,
+      cv,
+      cv.viecCon.filter((x) => x.id !== vc.id),
+      { truong: 'viecCon', tu: { ten: vc.ten, xong: vc.xong }, den: null },
+    )
+  }
+
+  // ---------- Bình luận ----------
+
+  /** Ai liên quan tới công việc (giao, thực hiện, theo dõi) đều đọc và viết bình luận được. */
+  async danhSachBinhLuan(nd: NguoiDung, id: string): Promise<BinhLuan[]> {
+    await this.layViecDuocXem(nd, id)
+    return (await this.kho.binhLuan.danhSach(nd.congTyId, id)).map(sangBinhLuan)
+  }
+
+  async vietBinhLuan(nd: NguoiDung, id: string, body: VietBinhLuan): Promise<BinhLuan> {
+    await this.layViecDuocXem(nd, id)
+    const bl = await this.kho.binhLuan.ghi({
+      congTyId: nd.congTyId,
+      congViecId: id,
+      nguoiVietId: nd.userId,
+      noiDung: body.noiDung,
+      taoLuc: this.dongHo(),
+    })
+    return sangBinhLuan(bl)
+  }
+
   // ---------- Hỗ trợ ----------
+
+  private kiemTraQuanLyViecCon(cv: CongViecBanGhi, userId: string): void {
+    if (!xacDinhVaiTro(cv, userId).laNguoiGiao) {
+      throw new LoiNghiepVu('KHONG_CO_QUYEN', 'Chỉ người giao việc mới được thêm hoặc xóa việc con')
+    }
+    if (!coTheQuanLyViecCon(cv.trangThai)) {
+      throw new LoiNghiepVu(
+        'TRANG_THAI_KHONG_HOP_LE',
+        'Chỉ thêm hoặc xóa việc con khi công việc chưa bắt đầu hoặc đang làm',
+      )
+    }
+  }
+
+  private timViecCon(cv: CongViecBanGhi, viecConId: string): ViecCon {
+    const vc = cv.viecCon.find((x) => x.id === viecConId)
+    if (!vc) throw new LoiNghiepVu('KHONG_TIM_THAY', 'Không tìm thấy việc con')
+    return vc
+  }
+
+  /** Ghi danh sách việc con mới, tính lại tiến độ, ghi một dòng lịch sử — trong một giao dịch có khóa. */
+  private async ghiViecCon(
+    nd: NguoiDung,
+    cv: CongViecBanGhi,
+    viecCon: ViecCon[],
+    thayDoiViecCon: ThayDoiTruong,
+  ): Promise<ChiTietCongViec> {
+    const tienDo = tinhTienDo(viecCon, cv.trangThai, cv.tienDo)
+    const thayDoi: ThayDoiCongViec = { viecCon }
+    const khacBiet: ThayDoiTruong[] = [thayDoiViecCon]
+    if (tienDo !== cv.tienDo) {
+      thayDoi.tienDo = tienDo
+      khacBiet.push({ truong: 'tienDo', tu: cv.tienDo, den: tienDo })
+    }
+    const luc = this.dongHo()
+    const moi = await this.ghiCoKhoa(cv, thayDoi, luc, (tx) => this.ghiLichSu(tx, nd, cv.id, 'VIEC_CON', khacBiet, luc))
+    return sangChiTiet(moi, nd.userId, luc)
+  }
 
   /**
    * Ghi thay đổi với điều kiện trạng thái và phiên bản vẫn như lúc đọc, rồi ghi lịch sử, tất cả trong
@@ -341,6 +455,7 @@ export function sangCongViec(cv: CongViecBanGhi, luc: Date): CongViec {
     hetHan: cv.hetHan,
     trangThai: cv.trangThai,
     tienDo: cv.tienDo,
+    viecCon: cv.viecCon.map((v) => ({ id: v.id, ten: v.ten, xong: v.xong })),
     quaHan: laQuaHan(cv, luc),
     congTyId: cv.congTyId,
     taoLuc: cv.taoLuc.toISOString(),
@@ -350,4 +465,14 @@ export function sangCongViec(cv: CongViecBanGhi, luc: Date): CongViec {
 
 function sangChiTiet(cv: CongViecBanGhi, userId: string, luc: Date): ChiTietCongViec {
   return { ...sangCongViec(cv, luc), quyen: tinhQuyen(cv, userId) }
+}
+
+function sangBinhLuan(bl: { id: string; congViecId: string; nguoiVietId: string; noiDung: string; taoLuc: Date }): BinhLuan {
+  return {
+    id: bl.id,
+    congViecId: bl.congViecId,
+    nguoiVietId: bl.nguoiVietId,
+    noiDung: bl.noiDung,
+    taoLuc: bl.taoLuc.toISOString(),
+  }
 }

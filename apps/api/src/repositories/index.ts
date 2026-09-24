@@ -1,4 +1,5 @@
 import type { ClientSession, Db, MongoClient } from 'mongodb'
+import { MongoBinhLuanRepository } from './binh-luan.repository.ts'
 import { MongoBoDemRepository } from './bo-dem.repository.ts'
 import { MongoCongViecRepository } from './cong-viec.repository.ts'
 import { MongoDuAnRepository, MongoNhanVienRepository } from './danh-muc.repository.ts'
@@ -15,6 +16,7 @@ export function taoKhoMongo(client: MongoClient, db: Db, coGiaoDich: boolean): K
       congViec: new MongoCongViecRepository(db, session),
       boDem: new MongoBoDemRepository(db, session),
       lichSu: new MongoLichSuRepository(db, session),
+      binhLuan: new MongoBinhLuanRepository(db, session),
       nhanVien: new MongoNhanVienRepository(db),
       duAn: new MongoDuAnRepository(db),
       giaoDich: async (fn) => {

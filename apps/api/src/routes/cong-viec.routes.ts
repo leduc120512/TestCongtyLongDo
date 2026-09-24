@@ -1,6 +1,10 @@
 import {
   CapNhatTienDoSchema,
   ChuyenTrangThaiSchema,
+  DanhDauViecConSchema,
+  ThemViecConSchema,
+  VietBinhLuanSchema,
+  type BinhLuan,
   DanhSachCongViecQuerySchema,
   IdSchema,
   SuaCongViecSchema,
@@ -18,6 +22,7 @@ import { kiemTra } from '../loi.ts'
 import type { CongViecService } from '../services/cong-viec.service.ts'
 
 const ThamSoIdSchema = z.object({ id: IdSchema })
+const ThamSoViecConSchema = z.object({ id: IdSchema, viecConId: IdSchema })
 const DemQuerySchema = DanhSachCongViecQuerySchema.pick({ duAnId: true, trangThai: true, uuTien: true, q: true })
 
 /**
@@ -73,6 +78,38 @@ export function congViecRoutes(congViec: CongViecService) {
     app.get('/cong-viec/:id/lich-su', async (req): Promise<PhanHoi<LichSu[]>> => {
       const { id } = kiemTra(ThamSoIdSchema, req.params)
       return { data: await congViec.lichSu(req.user, id) }
+    })
+
+    // Việc con
+    app.post('/cong-viec/:id/viec-con', async (req, reply): Promise<PhanHoi<ChiTietCongViec>> => {
+      const { id } = kiemTra(ThamSoIdSchema, req.params)
+      const body = kiemTra(ThemViecConSchema, req.body)
+      reply.status(201)
+      return { data: await congViec.themViecCon(req.user, id, body) }
+    })
+
+    app.post('/cong-viec/:id/viec-con/:viecConId/danh-dau', async (req): Promise<PhanHoi<ChiTietCongViec>> => {
+      const { id, viecConId } = kiemTra(ThamSoViecConSchema, req.params)
+      const body = kiemTra(DanhDauViecConSchema, req.body)
+      return { data: await congViec.danhDauViecCon(req.user, id, viecConId, body) }
+    })
+
+    app.delete('/cong-viec/:id/viec-con/:viecConId', async (req): Promise<PhanHoi<ChiTietCongViec>> => {
+      const { id, viecConId } = kiemTra(ThamSoViecConSchema, req.params)
+      return { data: await congViec.xoaViecCon(req.user, id, viecConId) }
+    })
+
+    // Bình luận
+    app.get('/cong-viec/:id/binh-luan', async (req): Promise<PhanHoi<BinhLuan[]>> => {
+      const { id } = kiemTra(ThamSoIdSchema, req.params)
+      return { data: await congViec.danhSachBinhLuan(req.user, id) }
+    })
+
+    app.post('/cong-viec/:id/binh-luan', async (req, reply): Promise<PhanHoi<BinhLuan>> => {
+      const { id } = kiemTra(ThamSoIdSchema, req.params)
+      const body = kiemTra(VietBinhLuanSchema, req.body)
+      reply.status(201)
+      return { data: await congViec.vietBinhLuan(req.user, id, body) }
     })
   }
 }

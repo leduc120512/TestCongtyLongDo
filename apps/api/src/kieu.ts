@@ -28,7 +28,7 @@ export type TruongSuaDuoc = (typeof TRUONG_SUA_DUOC)[number]
 export type ThayDoiCongViec = Partial<{
   [K in TruongSuaDuoc]: CongViecBanGhi[K] | null
 }> &
-  Partial<Pick<CongViecBanGhi, 'trangThai' | 'tienDo' | 'deletedAt'>>
+  Partial<Pick<CongViecBanGhi, 'trangThai' | 'tienDo' | 'viecCon' | 'deletedAt'>>
 
 export type LichSuBanGhi = {
   id: string
@@ -41,6 +41,16 @@ export type LichSuBanGhi = {
   lyDo?: string
 }
 export type LichSuMoi = Omit<LichSuBanGhi, 'id'>
+
+export type BinhLuanBanGhi = {
+  id: string
+  congTyId: string
+  congViecId: string
+  nguoiVietId: string
+  noiDung: string
+  taoLuc: Date
+}
+export type BinhLuanMoi = Omit<BinhLuanBanGhi, 'id'>
 
 export type NhanVienBanGhi = { id: string; ten: string; chucVu: string; congTyId: string }
 export type DuAnBanGhi = { id: string; ma: string; ten: string; congTyId: string }

@@ -1,5 +1,7 @@
 import type { LocNhanh, LocTrangThai, SapXep, ThongKeNhanh, TrangThai, UuTien } from '@longdo/contracts'
 import type {
+  BinhLuanBanGhi,
+  BinhLuanMoi,
   CongViecBanGhi,
   CongViecMoi,
   DuAnBanGhi,
@@ -65,6 +67,12 @@ export interface LichSuRepository {
   danhSach(congTyId: string, congViecId: string): Promise<LichSuBanGhi[]>
 }
 
+export interface BinhLuanRepository {
+  ghi(banGhi: BinhLuanMoi): Promise<BinhLuanBanGhi>
+  /** Bình luận của một công việc, cũ trước mới sau. */
+  danhSach(congTyId: string, congViecId: string): Promise<BinhLuanBanGhi[]>
+}
+
 export interface NhanVienRepository {
   danhSach(congTyId: string): Promise<NhanVienBanGhi[]>
   /** Tất cả nhân viên mọi công ty, chỉ dùng cho màn chọn "Đang đăng nhập là ai". */
@@ -82,6 +90,7 @@ export type KhoDuLieu = {
   congViec: CongViecRepository
   boDem: BoDemRepository
   lichSu: LichSuRepository
+  binhLuan: BinhLuanRepository
   nhanVien: NhanVienRepository
   duAn: DuAnRepository
   /**

@@ -31,6 +31,8 @@ export type CongViecDoc = {
   hanSapXep: string
   trangThai: TrangThai
   tienDo: number
+  /** Việc con nhúng trong công việc (danh sách ngắn, ghi cùng lúc với tiến độ). */
+  viecCon?: Array<{ id: string; ten: string; xong: boolean }>
   /** Tăng 1 sau mỗi lần ghi; dùng làm khóa lạc quan. */
   phienBan: number
   taoLuc: Date
@@ -54,6 +56,7 @@ function sangBanGhi(d: CongViecDoc): CongViecBanGhi {
     hetHan: d.hetHan,
     trangThai: d.trangThai,
     tienDo: d.tienDo,
+    viecCon: (d.viecCon ?? []).map((v) => ({ id: v.id, ten: v.ten, xong: v.xong })),
     phienBan: d.phienBan ?? 0,
     taoLuc: d.taoLuc,
     capNhatLuc: d.capNhatLuc,
@@ -104,6 +107,7 @@ export class MongoCongViecRepository implements CongViecRepository {
       hanSapXep: duLieu.hetHan ?? KHONG_CO_HAN,
       trangThai: duLieu.trangThai,
       tienDo: duLieu.tienDo,
+      viecCon: duLieu.viecCon.map((v) => ({ id: v.id, ten: v.ten, xong: v.xong })),
       phienBan: 0,
       taoLuc: duLieu.taoLuc,
       capNhatLuc: duLieu.capNhatLuc,

@@ -20,6 +20,7 @@ export const TEN_BANG = {
   duAn: 'du_an',
   congViec: 'cong_viec',
   lichSu: 'lich_su_cong_viec',
+  binhLuan: 'binh_luan_cong_viec',
   boDem: 'bo_dem',
 } as const
 
@@ -47,6 +48,9 @@ export async function taoIndex(db: Db): Promise<void> {
     db
       .collection(TEN_BANG.lichSu)
       .createIndex({ congTyId: 1, congViecId: 1, luc: -1, _id: -1 }, { name: 'lich_su_theo_viec_luc' }),
+    db
+      .collection(TEN_BANG.binhLuan)
+      .createIndex({ congTyId: 1, congViecId: 1, taoLuc: -1, _id: -1 }, { name: 'binh_luan_theo_viec' }),
     db
       .collection(TEN_BANG.nhanVien)
       .createIndex({ congTyId: 1, ten: 1 }, { name: 'nhan_vien_theo_cong_ty', collation: { locale: 'vi' } }),

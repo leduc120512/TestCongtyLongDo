@@ -133,6 +133,52 @@ export const DanhSachCongViecQuerySchema = PhanTrangQuerySchema.extend({
 export type DanhSachCongViecQuery = z.output<typeof DanhSachCongViecQuerySchema>
 export type DanhSachCongViecQueryInput = z.input<typeof DanhSachCongViecQuerySchema>
 
+// ---------- Việc con (tùy chọn 1) ----------
+
+/** Tối đa số việc con trong một công việc. */
+export const SO_VIEC_CON_TOI_DA = 50
+
+export const ViecConSchema = z.object({
+  id: z.string(),
+  ten: z.string(),
+  xong: z.boolean(),
+})
+export type ViecCon = z.infer<typeof ViecConSchema>
+
+export const ThemViecConSchema = z.object({
+  ten: z
+    .string({ error: 'Tên việc con không được để trống' })
+    .trim()
+    .min(1, 'Tên việc con không được để trống')
+    .max(200, 'Tên việc con tối đa 200 ký tự'),
+})
+export type ThemViecCon = z.infer<typeof ThemViecConSchema>
+
+export const DanhDauViecConSchema = z.object({
+  xong: z.boolean({ error: 'Trạng thái việc con phải là đúng/sai' }),
+})
+export type DanhDauViecCon = z.infer<typeof DanhDauViecConSchema>
+
+// ---------- Bình luận (tùy chọn 2) ----------
+
+export const BinhLuanSchema = z.object({
+  id: z.string(),
+  congViecId: z.string(),
+  nguoiVietId: z.string(),
+  noiDung: z.string(),
+  taoLuc: z.string(),
+})
+export type BinhLuan = z.infer<typeof BinhLuanSchema>
+
+export const VietBinhLuanSchema = z.object({
+  noiDung: z
+    .string({ error: 'Nội dung bình luận không được để trống' })
+    .trim()
+    .min(1, 'Nội dung bình luận không được để trống')
+    .max(2000, 'Bình luận tối đa 2000 ký tự'),
+})
+export type VietBinhLuan = z.infer<typeof VietBinhLuanSchema>
+
 // ---------- Dữ liệu trả về ----------
 
 export const CongViecSchema = z.object({
@@ -149,6 +195,8 @@ export const CongViecSchema = z.object({
   hetHan: NgaySchema.optional(),
   trangThai: TrangThaiSchema,
   tienDo: z.number().int().min(0).max(100),
+  /** Danh sách đầu việc; khi có ít nhất một việc con thì tiến độ tự tính theo tỉ lệ việc con đã xong. */
+  viecCon: z.array(ViecConSchema),
   /** Tính lúc đọc: chưa hoàn thành và đã qua hết ngày hetHan theo giờ Việt Nam. */
   quaHan: z.boolean(),
   congTyId: z.string(),
@@ -166,6 +214,10 @@ export const QuyenCongViecSchema = z.object({
   duyet: z.boolean(),
   traLai: z.boolean(),
   capNhatTienDo: z.boolean(),
+  /** Thêm/xóa việc con (người giao, khi chưa bắt đầu hoặc đang làm). */
+  quanLyViecCon: z.boolean(),
+  /** Đánh dấu việc con xong/chưa xong (người thực hiện, khi đang làm). */
+  danhDauViecCon: z.boolean(),
 })
 export type QuyenCongViec = z.infer<typeof QuyenCongViecSchema>
 
@@ -184,7 +236,7 @@ export type ThongKeNhanh = z.infer<typeof ThongKeNhanhSchema>
 
 // ---------- Lịch sử thay đổi ----------
 
-export const HANH_DONG_LICH_SU = ['TAO', 'SUA', 'CHUYEN_TRANG_THAI', 'CAP_NHAT_TIEN_DO', 'XOA'] as const
+export const HANH_DONG_LICH_SU = ['TAO', 'SUA', 'CHUYEN_TRANG_THAI', 'CAP_NHAT_TIEN_DO', 'VIEC_CON', 'XOA'] as const
 export const HanhDongLichSuSchema = z.enum(HANH_DONG_LICH_SU)
 export type HanhDongLichSu = z.infer<typeof HanhDongLichSuSchema>
 export const TEN_HANH_DONG: Record<HanhDongLichSu, string> = {
@@ -192,6 +244,7 @@ export const TEN_HANH_DONG: Record<HanhDongLichSu, string> = {
   SUA: 'Sửa thông tin',
   CHUYEN_TRANG_THAI: 'Chuyển trạng thái',
   CAP_NHAT_TIEN_DO: 'Cập nhật tiến độ',
+  VIEC_CON: 'Việc con',
   XOA: 'Xóa công việc',
 }
 
@@ -225,5 +278,6 @@ export const TEN_TRUONG: Record<string, string> = {
   hetHan: 'Hạn',
   trangThai: 'Trạng thái',
   tienDo: 'Tiến độ',
+  viecCon: 'Việc con',
   deletedAt: 'Đã xóa',
 }
