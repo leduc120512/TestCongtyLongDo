@@ -96,6 +96,7 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
     await db.collection(TEN_BANG.congViec).deleteMany({})
     await db.collection(TEN_BANG.lichSu).deleteMany({})
     await db.collection(TEN_BANG.boDem).deleteMany({})
+    await db.collection(TEN_BANG.binhLuan).deleteMany({})
   })
 
   afterAll(async () => {
@@ -224,7 +225,8 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
       await buoc(GIAO, { trangThai: 'DANG_LAM', lyDo: 'Thiếu biên bản' })
       await buoc(LAM, { trangThai: 'CHO_DUYET' })
       const xong = await buoc(GIAO, { trangThai: 'HOAN_THANH' })
-      expect(xong.quyen).toEqual({ sua: false, xoa: false, batDau: false, guiDuyet: false, duyet: false, traLai: false, capNhatTienDo: false })
+      // Hoàn thành là trạng thái cuối: không còn quyền thao tác nào.
+      expect(Object.values(xong.quyen).every((x) => x === false)).toBe(true)
       expect((await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, { ten: 'x' })).statusCode).toBe(409)
       expect((await goi('DELETE', `/api/cong-viec/${cv.id}`, GIAO)).statusCode).toBe(409)
     })
@@ -517,6 +519,50 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
       expect((await goi('GET', `/api/cong-viec/${cv1.id}`, GIAO)).json().data.ten).toBe(cv1.ten)
       // Lượt tăng bộ đếm của lần tạo thất bại đã được hoàn tác → việc tiếp theo là CV-0002, không phải CV-0003.
       expect((await taoViec()).ma).toBe('CV-0002')
+    })
+  })
+  describe('tùy chọn: việc con và bình luận qua HTTP', () => {
+    it('luồng việc con: thêm (201), đánh dấu, xóa; quyền và dạng response', async () => {
+      const cv = await taoViec()
+      const them = await goi('POST', `/api/cong-viec/${cv.id}/viec-con`, GIAO, { ten: 'Khoan cọc' })
+      expect(them.statusCode, them.body).toBe(201)
+      const vcId = them.json().data.viecCon[0].id
+      expect(typeof vcId).toBe('string')
+      await goi('POST', `/api/cong-viec/${cv.id}/viec-con`, GIAO, { ten: 'Đổ bê tông cọc' })
+      expect((await goi('POST', `/api/cong-viec/${cv.id}/viec-con`, LAM, { ten: 'x' })).statusCode).toBe(403)
+      expect((await goi('POST', `/api/cong-viec/${cv.id}/viec-con`, GIAO, { ten: '  ' })).statusCode).toBe(400)
+
+      await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, { trangThai: 'DANG_LAM' })
+      const danhDau = await goi('POST', `/api/cong-viec/${cv.id}/viec-con/${vcId}/danh-dau`, LAM, { xong: true })
+      expect(danhDau.statusCode, danhDau.body).toBe(200)
+      expect(danhDau.json().data.tienDo).toBe(50)
+      expect((await goi('POST', `/api/cong-viec/${cv.id}/viec-con/${vcId}/danh-dau`, LAM, { xong: 'có' })).statusCode).toBe(400)
+      expect((await goi('POST', `/api/cong-viec/${cv.id}/viec-con/${vcId}/danh-dau`, XEM, { xong: false })).statusCode).toBe(403)
+      expect((await goi('POST', `/api/cong-viec/${cv.id}/tien-do`, LAM, { tienDo: 90 })).statusCode).toBe(409)
+      expect((await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, { trangThai: 'CHO_DUYET' })).statusCode).toBe(409)
+
+      const vc2 = danhDau.json().data.viecCon[1].id
+      const xoa = await goi('DELETE', `/api/cong-viec/${cv.id}/viec-con/${vc2}`, GIAO)
+      expect(xoa.json().data).toMatchObject({ tienDo: 100, viecCon: [{ id: vcId, ten: 'Khoan cọc', xong: true }] })
+
+      const doc = await db.collection(TEN_BANG.congViec).findOne({ _id: new ObjectId(cv.id) })
+      expect(doc!.viecCon).toEqual([{ id: vcId, ten: 'Khoan cọc', xong: true }])
+    })
+
+    it('bình luận: người liên quan viết/đọc, người ngoài và công ty khác nhận 404', async () => {
+      const cv = await taoViec()
+      const viet = await goi('POST', `/api/cong-viec/${cv.id}/binh-luan`, XEM, { noiDung: '  Cần biên bản có chữ ký TVGS  ' })
+      expect(viet.statusCode, viet.body).toBe(201)
+      expect(viet.json().data).toMatchObject({ nguoiVietId: XEM.toHexString(), noiDung: 'Cần biên bản có chữ ký TVGS' })
+      await goi('POST', `/api/cong-viec/${cv.id}/binh-luan`, LAM, { noiDung: 'Đã bổ sung' })
+      const ds = (await goi('GET', `/api/cong-viec/${cv.id}/binh-luan`, GIAO)).json()
+      expect(ds.data.map((b: { noiDung: string }) => b.noiDung)).toEqual(['Cần biên bản có chữ ký TVGS', 'Đã bổ sung'])
+      expect((await goi('GET', `/api/cong-viec/${cv.id}/binh-luan`, NGOAI)).statusCode).toBe(404)
+      expect((await goi('POST', `/api/cong-viec/${cv.id}/binh-luan`, NV_CT_KHAC, { noiDung: 'x' })).statusCode).toBe(404)
+      expect((await goi('POST', `/api/cong-viec/${cv.id}/binh-luan`, GIAO, { noiDung: '' })).statusCode).toBe(400)
+      const luu = await db.collection(TEN_BANG.binhLuan).findOne({})
+      for (const [k, v] of Object.entries(luu!)) expect(v, k).not.toBeUndefined()
+      expect(luu!.congTyId).toBeInstanceOf(ObjectId)
     })
   })
 })

@@ -1,5 +1,14 @@
 import type { LocNhanh, SapXep, ThongKeNhanh } from '@longdo/contracts'
-import type { CongViecBanGhi, CongViecMoi, DuAnBanGhi, LichSuBanGhi, LichSuMoi, NhanVienBanGhi, ThayDoiCongViec } from '../../src/kieu.ts'
+import type {
+  BinhLuanBanGhi,
+  CongViecBanGhi,
+  CongViecMoi,
+  DuAnBanGhi,
+  LichSuBanGhi,
+  LichSuMoi,
+  NhanVienBanGhi,
+  ThayDoiCongViec,
+} from '../../src/kieu.ts'
 import type {
   BoLocCongViec,
   CongViecRepository,
@@ -97,6 +106,7 @@ export function taoKhoBoNho(): KhoBoNho {
   const nhanVien: NhanVienBanGhi[] = []
   const duAn: DuAnBanGhi[] = []
   const lichSuDs: LichSuBanGhi[] = []
+  const binhLuanDs: BinhLuanBanGhi[] = []
   const boDem = new Map<string, number>()
 
   const kho: KhoBoNho = {
@@ -121,6 +131,16 @@ export function taoKhoBoNho(): KhoBoNho {
         return lichSuDs
           .filter((x) => x.congTyId === congTyId && x.congViecId === congViecId)
           .sort((a, b) => b.luc.getTime() - a.luc.getTime())
+      },
+    },
+    binhLuan: {
+      async ghi(bl) {
+        const moi = { ...structuredClone(bl), id: taoId() }
+        binhLuanDs.push(moi)
+        return moi
+      },
+      async danhSach(congTyId, congViecId) {
+        return binhLuanDs.filter((x) => x.congTyId === congTyId && x.congViecId === congViecId)
       },
     },
     nhanVien: {

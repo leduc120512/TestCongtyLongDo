@@ -17,6 +17,8 @@ const KHONG: QuyenCongViec = {
   duyet: false,
   traLai: false,
   capNhatTienDo: false,
+  quanLyViecCon: false,
+  danhDauViecCon: false,
 }
 
 describe('xacDinhVaiTro', () => {
@@ -45,15 +47,20 @@ describe('tinhQuyen — nút nào được hiện theo vai trò và trạng thá
   })
 
   it('người giao: sửa/xóa khi chưa hoàn thành, duyệt/trả lại khi chờ duyệt', () => {
-    expect(tinhQuyen(viec('CHUA_BAT_DAU'), 'giao')).toEqual({ ...KHONG, sua: true, xoa: true })
-    expect(tinhQuyen(viec('DANG_LAM'), 'giao')).toEqual({ ...KHONG, sua: true, xoa: true })
+    expect(tinhQuyen(viec('CHUA_BAT_DAU'), 'giao')).toEqual({ ...KHONG, sua: true, xoa: true, quanLyViecCon: true })
+    expect(tinhQuyen(viec('DANG_LAM'), 'giao')).toEqual({ ...KHONG, sua: true, xoa: true, quanLyViecCon: true })
     expect(tinhQuyen(viec('CHO_DUYET'), 'giao')).toEqual({ ...KHONG, sua: true, xoa: true, duyet: true, traLai: true })
     expect(tinhQuyen(viec('HOAN_THANH'), 'giao')).toEqual(KHONG)
   })
 
   it('người thực hiện: không bao giờ sửa/xóa; bắt đầu, cập nhật tiến độ, gửi duyệt đúng lúc', () => {
     expect(tinhQuyen(viec('CHUA_BAT_DAU'), 'lam')).toEqual({ ...KHONG, batDau: true })
-    expect(tinhQuyen(viec('DANG_LAM'), 'lam')).toEqual({ ...KHONG, guiDuyet: true, capNhatTienDo: true })
+    expect(tinhQuyen(viec('DANG_LAM'), 'lam')).toEqual({
+      ...KHONG,
+      guiDuyet: true,
+      capNhatTienDo: true,
+      danhDauViecCon: true,
+    })
     expect(tinhQuyen(viec('CHO_DUYET'), 'lam')).toEqual(KHONG)
     expect(tinhQuyen(viec('HOAN_THANH'), 'lam')).toEqual(KHONG)
   })
@@ -67,6 +74,20 @@ describe('tinhQuyen — nút nào được hiện theo vai trò và trạng thá
       xoa: true,
       guiDuyet: true,
       capNhatTienDo: true,
+      quanLyViecCon: true,
+      danhDauViecCon: true,
     })
+  })
+
+  it('có việc con: không nhập tiến độ tay; còn việc con chưa xong thì chưa gửi duyệt', () => {
+    const coViecCon = { ...viec('DANG_LAM'), viecCon: [{ xong: true }, { xong: false }] }
+    expect(tinhQuyen(coViecCon, 'lam')).toMatchObject({ capNhatTienDo: false, guiDuyet: false, danhDauViecCon: true })
+    const xongHet = { ...viec('DANG_LAM'), viecCon: [{ xong: true }, { xong: true }] }
+    expect(tinhQuyen(xongHet, 'lam')).toMatchObject({ capNhatTienDo: false, guiDuyet: true })
+  })
+
+  it('người giao không thêm/xóa việc con khi chờ duyệt hoặc đã hoàn thành', () => {
+    expect(tinhQuyen(viec('CHO_DUYET'), 'giao').quanLyViecCon).toBe(false)
+    expect(tinhQuyen(viec('HOAN_THANH'), 'giao').quanLyViecCon).toBe(false)
   })
 })
