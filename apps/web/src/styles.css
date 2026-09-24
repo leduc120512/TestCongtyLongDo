@@ -302,6 +302,10 @@ button.link-button {
   background: var(--gray-bg);
 }
 
+.table tbody tr.clickable-row {
+  cursor: pointer;
+}
+
 .table td a {
   text-decoration: none;
 }

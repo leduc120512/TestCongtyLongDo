@@ -10,7 +10,7 @@ import {
   type Priority,
 } from '@longdo/contracts'
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { formatDate } from '../components/format'
 import { StatusBadge, PriorityBadge } from '../components/Badges'
 import { Pagination } from '../components/Pagination'
@@ -20,6 +20,7 @@ import { useTaskList, useQuickFilterCounts } from '../hooks/useTasks'
 import { useProjects, useLookup } from '../hooks/useCatalog'
 
 export default function ListPage() {
+  const navigate = useNavigate()
   const { filters, setFilters } = useUrlFilters()
   const list = useTaskList(filters)
   const counts = useQuickFilterCounts({ duAnId: filters.duAnId, trangThai: filters.trangThai, uuTien: filters.uuTien, q: filters.q })
@@ -193,7 +194,16 @@ export default function ListPage() {
               </thead>
               <tbody>
                 {list.data.data.map((task) => (
-                  <tr key={task.id} className={task.quaHan ? 'overdue-row' : undefined}>
+                  <tr
+                    key={task.id}
+                    className={`clickable-row${task.quaHan ? ' overdue-row' : ''}`}
+                    onClick={(event) => {
+                      if (!(event.target instanceof Element) || !event.target.closest('a')) {
+                        navigate(`/cong-viec/${task.id}`)
+                      }
+                    }}
+                    title={`Mở công việc ${task.ma}`}
+                  >
                     <td className="code">
                       <Link to={`/cong-viec/${task.id}`}>{task.ma}</Link>
                     </td>
