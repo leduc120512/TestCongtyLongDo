@@ -195,12 +195,31 @@ describe('sửa thông tin', () => {
     expect(await maLoi(sv.sua(nd(GIAO), cv.id, { ten: 'x' }))).toBe('TRANG_THAI_KHONG_HOP_LE')
   })
 
+  it('người vừa bị gỡ khỏi danh sách thực hiện không ghi được trên bản đã đọc trước đó', async () => {
+    const cv = await sv.tao(nd(GIAO), viecMoi())
+    await sv.chuyenTrangThai(nd(LAM), cv.id, { trangThai: 'DANG_LAM' })
+    const banLamDoc = await kho.congViec.timTheoId(CT, cv.id)
+    await sv.sua(nd(GIAO), cv.id, { nguoiThucHienIds: [LAM_2] })
+    // LAM đã đọc bản cũ (còn là người thực hiện) nhưng phiên bản đã tăng → không khớp → không ghi.
+    const ghi = await kho.congViec.capNhat(CT, cv.id, { trangThai: 'DANG_LAM', phienBan: banLamDoc!.phienBan }, { tienDo: 90 }, new Date())
+    expect(ghi).toBeNull()
+    expect(await maLoi(sv.capNhatTienDo(nd(LAM), cv.id, { tienDo: 90 }))).toBe('KHONG_TIM_THAY')
+  })
+
+  it('mỗi lần ghi tăng phiên bản đúng 1', async () => {
+    const cv = await sv.tao(nd(GIAO), viecMoi())
+    expect(kho.congViec.ds.get(cv.id)!.phienBan).toBe(0)
+    await sv.sua(nd(GIAO), cv.id, { ten: 'a' })
+    await sv.chuyenTrangThai(nd(LAM), cv.id, { trangThai: 'DANG_LAM' })
+    expect(kho.congViec.ds.get(cv.id)!.phienBan).toBe(2)
+  })
+
   it('hai người sửa cùng lúc từ cùng một bản: người sau nhận XUNG_DOT, không ghi đè im lặng', async () => {
     const cv = await sv.tao(nd(GIAO), viecMoi())
     const banDoc = await kho.congViec.timTheoId(CT, cv.id)
     await sv.sua(nd(GIAO), cv.id, { ten: 'Lần 1' })
     // Mô phỏng yêu cầu thứ hai đã đọc bản cũ trước khi lần 1 ghi xong.
-    const moi = await kho.congViec.capNhat(CT, cv.id, { capNhatLuc: banDoc!.capNhatLuc }, { ten: 'Lần 2' }, new Date())
+    const moi = await kho.congViec.capNhat(CT, cv.id, { phienBan: banDoc!.phienBan }, { ten: 'Lần 2' }, new Date())
     expect(moi).toBeNull()
   })
 })

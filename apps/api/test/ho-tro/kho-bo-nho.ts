@@ -37,8 +37,8 @@ class CongViecBoNho implements CongViecRepository {
     const cv = this.ds.get(id)
     if (!cv || cv.congTyId !== congTyId || cv.deletedAt) return null
     if (dk.trangThai && cv.trangThai !== dk.trangThai) return null
-    if (dk.capNhatLuc && cv.capNhatLuc.getTime() !== dk.capNhatLuc.getTime()) return null
-    const moi: Record<string, unknown> = { ...cv, capNhatLuc: luc }
+    if (dk.phienBan !== undefined && cv.phienBan !== dk.phienBan) return null
+    const moi: Record<string, unknown> = { ...cv, capNhatLuc: luc, phienBan: cv.phienBan + 1 }
     for (const [k, v] of Object.entries(thayDoi)) {
       if (v === undefined) continue
       if (v === null) delete moi[k]
@@ -99,9 +99,11 @@ export function taoKhoBoNho(): KhoBoNho {
   const lichSuDs: LichSuBanGhi[] = []
   const boDem = new Map<string, number>()
 
-  return {
+  const kho: KhoBoNho = {
     congViec: new CongViecBoNho(),
     lichSuDs,
+    // Trong bộ nhớ không có giao dịch thật; test tính nguyên tử nằm ở test tích hợp Mongo.
+    giaoDich: (fn) => fn(kho),
     themNhanVien: (nv) => nhanVien.push(nv),
     themDuAn: (da) => duAn.push(da),
     boDem: {
@@ -144,4 +146,5 @@ export function taoKhoBoNho(): KhoBoNho {
       },
     },
   }
+  return kho
 }

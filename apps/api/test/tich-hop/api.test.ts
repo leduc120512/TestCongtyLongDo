@@ -3,6 +3,7 @@ import { MongoClient, ObjectId, type Db } from 'mongodb'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { taoApp } from '../../src/app.ts'
 import { taoIndex, TEN_BANG } from '../../src/db/ket-noi.ts'
+import { xayDungBoLoc, type CongViecDoc } from '../../src/repositories/cong-viec.repository.ts'
 import { taoKhoMongo } from '../../src/repositories/index.ts'
 
 /**
@@ -14,7 +15,10 @@ const MONGO_GOC = process.env.MONGO_URL_TEST ?? 'mongodb://localhost:27017'
 const TEN_DB = `longdo_congviec_test_${process.pid}`
 
 async function thuKetNoi(): Promise<MongoClient | null> {
-  const client = new MongoClient(`${MONGO_GOC}/${TEN_DB}`, { serverSelectionTimeoutMS: 1500, ignoreUndefined: true })
+  const client = new MongoClient(`${MONGO_GOC}/${TEN_DB}?directConnection=true`, {
+    serverSelectionTimeoutMS: 1500,
+    ignoreUndefined: true,
+  })
   try {
     await client.connect()
     return client
@@ -39,6 +43,7 @@ const DU_AN = id()
 describe.skipIf(!client)('API tích hợp với MongoDB', () => {
   let db: Db
   let app: FastifyInstance
+  let coGiaoDich = false
   let bayGio = new Date('2026-06-05T03:00:00Z')
   const token: Record<string, string> = {}
 
@@ -77,7 +82,9 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
       { _id: NV_CT_KHAC, congTyId: CT_KHAC, ten: 'Người công ty khác', chucVu: 'Kỹ sư' },
     ])
     await db.collection(TEN_BANG.duAn).insertOne({ _id: DU_AN, congTyId: CT, ma: 'CNC', ten: 'Cầu Nam Căn' })
-    app = await taoApp({ kho: taoKhoMongo(db), jwtSecret: 'bi-mat-test', dongHo: () => bayGio })
+    const hello = await db.admin().command({ hello: 1 })
+    coGiaoDich = Boolean(hello.setName)
+    app = await taoApp({ kho: taoKhoMongo(client!, db, coGiaoDich), jwtSecret: 'bi-mat-test', dongHo: () => bayGio })
     for (const nv of [GIAO, LAM, XEM, NGOAI, NV_CT_KHAC]) {
       const res = await goi('POST', '/api/xac-thuc/dang-nhap-gia-lap', undefined, { userId: nv.toHexString() })
       token[nv.toHexString()] = res.json().data.token
@@ -136,7 +143,7 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
       const { data } = res.json()
       expect(typeof data.id).toBe('string')
       expect(data.nguoiThucHienIds).toEqual([LAM.toHexString()])
-      for (const noiBo of ['_id', 'tuKhoa', 'hanSapXep', 'deletedAt']) expect(data).not.toHaveProperty(noiBo)
+      for (const noiBo of ['_id', 'tuKhoa', 'hanSapXep', 'deletedAt', 'phienBan']) expect(data).not.toHaveProperty(noiBo)
     })
 
     it('danh sách trả { data, meta: { page, limit, total } }', async () => {
@@ -363,6 +370,153 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
       })
       expect(res.statusCode).toBe(400)
       expect(res.json().error.message).toContain('Hạn không được trước ngày bắt đầu')
+    })
+  })
+  describe('hồi quy sau review', () => {
+    it('PATCH chỉ gửi {ten}: ưu tiên và người theo dõi giữ nguyên, lịch sử đúng 1 thay đổi', async () => {
+      const cv = await taoViec({ uuTien: 'CAO' })
+      const res = await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, { ten: 'Chỉ đổi tên' })
+      expect(res.statusCode, res.body).toBe(200)
+      expect(res.json().data).toMatchObject({ ten: 'Chỉ đổi tên', uuTien: 'CAO', nguoiTheoDoiIds: [XEM.toHexString()] })
+      expect((await goi('GET', `/api/cong-viec/${cv.id}`, XEM)).statusCode).toBe(200)
+      const ls = (await goi('GET', `/api/cong-viec/${cv.id}/lich-su`, GIAO)).json().data
+      const sua = ls.filter((x: { hanhDong: string }) => x.hanhDong === 'SUA')
+      expect(sua).toHaveLength(1)
+      expect(sua[0].thayDoi).toEqual([{ truong: 'ten', tu: 'Nghiệm thu cọc khoan nhồi trụ T5', den: 'Chỉ đổi tên' }])
+    })
+
+    it('PATCH {hetHan: null} không đụng tới ưu tiên và người theo dõi', async () => {
+      const cv = await taoViec({ uuTien: 'CAO' })
+      const moi = (await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, { hetHan: null })).json().data
+      expect(moi.hetHan).toBeUndefined()
+      expect(moi).toMatchObject({ uuTien: 'CAO', nguoiTheoDoiIds: [XEM.toHexString()] })
+    })
+
+    it('tiến độ không nhận null, chuỗi rỗng, chuỗi số, boolean, số lẻ, ngoài 0..100', async () => {
+      const cv = await taoViec()
+      await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, { trangThai: 'DANG_LAM' })
+      await goi('POST', `/api/cong-viec/${cv.id}/tien-do`, LAM, { tienDo: 70 })
+      for (const tienDo of [null, '', '50', true, [50], 50.5, 101, -1]) {
+        const res = await goi('POST', `/api/cong-viec/${cv.id}/tien-do`, LAM, { tienDo })
+        expect(res.statusCode, JSON.stringify(tienDo)).toBe(400)
+        expect(res.json().error.code).toBe('VALIDATION')
+      }
+      expect((await goi('GET', `/api/cong-viec/${cv.id}`, LAM)).json().data.tienDo).toBe(70)
+    })
+
+    it('URL mã hóa sai và tham số quá dài vẫn trả đúng dạng { error: { code, message } }', async () => {
+      const sai = await goi('GET', '/api/cong-viec/%zz', GIAO)
+      expect(sai.statusCode).toBe(400)
+      expect(sai.json()).toEqual({ error: { code: 'VALIDATION', message: expect.any(String) } })
+      const dai = await goi('GET', `/api/cong-viec/${'a'.repeat(200)}`, GIAO)
+      expect(dai.json()).toEqual({ error: { code: expect.any(String), message: expect.any(String) } })
+    })
+
+    it('lỗi sai kiểu dữ liệu cũng báo tiếng Việt', async () => {
+      const cv = await taoViec()
+      const res = await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, ['khong-phai-object'])
+      expect(res.statusCode).toBe(400)
+      expect(res.json().error.message).not.toMatch(/Invalid input|expected/)
+    })
+
+    it('id viết hoa được chuẩn hóa: không bị coi là hai người khác nhau', async () => {
+      const hoa = LAM.toHexString().toUpperCase()
+      const cv = await taoViec({ nguoiThucHienIds: [hoa], nguoiTheoDoiIds: [LAM.toHexString(), XEM.toHexString()] })
+      expect(cv.nguoiThucHienIds).toEqual([LAM.toHexString()])
+      expect(cv.nguoiTheoDoiIds).toEqual([XEM.toHexString()])
+      await goi('PATCH', `/api/cong-viec/${cv.id}`, GIAO, { nguoiThucHienIds: [hoa] })
+      const ls = (await goi('GET', `/api/cong-viec/${cv.id}/lich-su`, GIAO)).json().data
+      expect(ls.filter((x: { hanhDong: string }) => x.hanhDong === 'SUA')).toHaveLength(0)
+    })
+
+    it('id sai định dạng → 400', async () => {
+      expect((await goi('GET', '/api/cong-viec/khong-phai-id', GIAO)).statusCode).toBe(400)
+      expect((await goi('GET', '/api/cong-viec?duAnId=xyz', GIAO)).statusCode).toBe(400)
+    })
+
+    it('"Tất cả" kèm bộ lọc phụ vẫn dùng 3 index vai trò và không sắp xếp trong bộ nhớ', async () => {
+      const col = db.collection<CongViecDoc>(TEN_BANG.congViec)
+      const boLocGoc = { congTyId: CT.toHexString(), userId: GIAO.toHexString(), homNay: '2026-06-05' }
+      const cacBoLoc = [
+        { trangThai: 'DANG_LAM' as const },
+        { trangThai: 'QUA_HAN' as const },
+        { uuTien: 'CAO' as const },
+        { duAnId: null },
+        { q: 'coc' },
+      ]
+      for (const phu of cacBoLoc) {
+        for (const nhanh of ['TAT_CA', 'CUA_TOI', 'TOI_GIAO', 'THEO_DOI'] as const) {
+          const plan = await col
+            .find(xayDungBoLoc({ ...boLocGoc, ...phu }, nhanh))
+            .sort({ hanSapXep: 1, _id: 1 })
+            .limit(20)
+            .explain('queryPlanner')
+          const chuoi = JSON.stringify(plan.queryPlanner.winningPlan)
+          const moTa = `${nhanh} + ${JSON.stringify(phu)}`
+          expect(chuoi, moTa).not.toContain('COLLSCAN')
+          expect(chuoi, moTa).not.toContain('"stage":"SORT"')
+          expect(chuoi, moTa).not.toContain('ma_duy_nhat_trong_cong_ty')
+          expect(chuoi, moTa).toMatch(/ds_viec_cua_toi|ds_viec_toi_giao|ds_dang_theo_doi/)
+        }
+      }
+    })
+
+    it('truy vấn lịch sử dùng index, không sắp xếp trong bộ nhớ', async () => {
+      const plan = await db
+        .collection(TEN_BANG.lichSu)
+        .find({ congTyId: CT, congViecId: new ObjectId() })
+        .sort({ luc: -1, _id: -1 })
+        .explain('queryPlanner')
+      const chuoi = JSON.stringify(plan.queryPlanner.winningPlan)
+      expect(chuoi).toContain('IXSCAN')
+      expect(chuoi).not.toContain('"stage":"SORT"')
+    })
+
+    it('nhiều người cập nhật tiến độ cùng lúc: chuỗi lịch sử "từ → đến" luôn liền mạch', async () => {
+      const cv = await taoViec({ nguoiThucHienIds: [LAM.toHexString(), GIAO.toHexString()] })
+      await goi('POST', `/api/cong-viec/${cv.id}/trang-thai`, LAM, { trangThai: 'DANG_LAM' })
+      const kq = await Promise.all(
+        [10, 20, 30, 40, 50, 60].map((tienDo, i) =>
+          goi('POST', `/api/cong-viec/${cv.id}/tien-do`, i % 2 ? LAM : GIAO, { tienDo }),
+        ),
+      )
+      for (const r of kq) expect([200, 409], r.body).toContain(r.statusCode)
+      const ls = (await goi('GET', `/api/cong-viec/${cv.id}/lich-su`, GIAO)).json().data
+      const cacBuoc = ls
+        .filter((x: { hanhDong: string }) => x.hanhDong === 'CAP_NHAT_TIEN_DO')
+        .reverse()
+        .map((x: { thayDoi: Array<{ tu: number; den: number }> }) => x.thayDoi[0]!)
+      expect(cacBuoc.length).toBe(kq.filter((r) => r.statusCode === 200).length)
+      let truoc = 0
+      for (const buoc of cacBuoc) {
+        expect(buoc.tu).toBe(truoc)
+        truoc = buoc.den
+      }
+      expect((await goi('GET', `/api/cong-viec/${cv.id}`, GIAO)).json().data.tienDo).toBe(truoc)
+    })
+
+    it('ghi lịch sử lỗi thì cả thao tác được hoàn tác: không có việc "mồ côi", không nhảy số', async (ctx) => {
+      if (!coGiaoDich) ctx.skip()
+      const cv1 = await taoViec()
+      // Buộc mọi lệnh ghi lịch sử thất bại.
+      await db.command({
+        collMod: TEN_BANG.lichSu,
+        validator: { khongBaoGioCo: { $exists: true } },
+        validationAction: 'error',
+      })
+      try {
+        const tao = await goi('POST', '/api/cong-viec', GIAO, { ten: 'Sẽ không được lưu', nguoiThucHienIds: [LAM.toHexString()] })
+        expect(tao.statusCode).toBe(500)
+        expect(tao.json().error.code).toBe('LOI_HE_THONG')
+        const sua = await goi('PATCH', `/api/cong-viec/${cv1.id}`, GIAO, { ten: 'Không được đổi' })
+        expect(sua.statusCode).toBe(500)
+      } finally {
+        await db.command({ collMod: TEN_BANG.lichSu, validator: {}, validationLevel: 'off' })
+      }
+      expect(await db.collection(TEN_BANG.congViec).countDocuments()).toBe(1)
+      expect((await goi('GET', `/api/cong-viec/${cv1.id}`, GIAO)).json().data.ten).toBe(cv1.ten)
+      // Lượt tăng bộ đếm của lần tạo thất bại đã được hoàn tác → việc tiếp theo là CV-0002, không phải CV-0003.
+      expect((await taoViec()).ma).toBe('CV-0002')
     })
   })
 })
