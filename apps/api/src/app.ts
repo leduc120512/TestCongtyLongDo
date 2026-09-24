@@ -1,5 +1,5 @@
 import jwt from '@fastify/jwt'
-import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyServerOptions } from 'fastify'
 import { batBuocDangNhap } from './plugins/xac-thuc.ts'
 import { dangKyXuLyLoi } from './plugins/xu-ly-loi.ts'
 import type { KhoDuLieu } from './repositories/giao-dien.ts'
@@ -19,9 +19,24 @@ export type TuyChonApp = {
 
 /** Dựng app mà không listen — index.ts listen, test dùng app.inject(). */
 export async function taoApp(tuyChon: TuyChonApp): Promise<FastifyInstance> {
-  const app = Fastify({ logger: tuyChon.logger ?? false })
+  const app = Fastify({
+    logger: tuyChon.logger ?? false,
+    // Lỗi Fastify tự trả trước khi tới route (URL mã hóa sai, tham số quá dài) cũng theo dạng { error }.
+    frameworkErrors: (err, _req, res) => {
+      const quaDai = err.code === 'FST_ERR_MAX_PARAM_LENGTH'
+      const reply = res as unknown as FastifyReply
+      void reply.status(quaDai ? 404 : 400).send({
+        error: { code: quaDai ? 'KHONG_TIM_THAY' : 'VALIDATION', message: 'Đường dẫn không hợp lệ' },
+      })
+    },
+  })
   dangKyXuLyLoi(app)
-  await app.register(jwt, { secret: tuyChon.jwtSecret })
+  // Token bắt buộc có hạn dùng (exp) và đúng thuật toán, tránh token "sống mãi" hoặc đổi thuật toán.
+  await app.register(jwt, {
+    secret: tuyChon.jwtSecret,
+    sign: { algorithm: 'HS256', expiresIn: '12h' },
+    verify: { algorithms: ['HS256'], requiredClaims: ['exp'] },
+  })
 
   const congViec = new CongViecService(tuyChon.kho, tuyChon.dongHo)
   const danhMuc = new DanhMucService(tuyChon.kho)

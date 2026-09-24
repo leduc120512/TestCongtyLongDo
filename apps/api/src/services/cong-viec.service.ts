@@ -98,11 +98,13 @@ export class CongViecService {
     await this.kiemTraNguoi(nd.congTyId, nguoiThucHienIds, nguoiTheoDoiIds)
     if (body.duAnId) await this.kiemTraDuAn(nd.congTyId, body.duAnId)
 
-    // Lấy số thứ tự SAU khi mọi kiểm tra đã qua, ngay trước khi ghi, để hạn chế nhảy số.
-    const so = await this.kho.boDem.laySoTiepTheo(nd.congTyId)
+    // Mọi kiểm tra xong mới lấy số. Tăng bộ đếm + tạo việc + ghi lịch sử nằm trong một giao dịch:
+    // lỗi ở bất kỳ bước nào thì cả khối được hoàn tác, số thứ tự không bị "mất" → không nhảy số.
     const luc = this.dongHo()
-    const cv = await this.kho.congViec.tao(
-      boUndefined({
+    const cv = await this.kho.giaoDich(async (tx) => {
+      const so = await tx.boDem.laySoTiepTheo(nd.congTyId)
+      const moi = await tx.congViec.tao(
+        boUndefined({
         congTyId: nd.congTyId,
         ma: taoMaCongViec(so),
         ten: body.ten,
@@ -116,11 +118,14 @@ export class CongViecService {
         hetHan: body.hetHan || undefined,
         trangThai: 'CHUA_BAT_DAU' as const,
         tienDo: 0,
+        phienBan: 0,
         taoLuc: luc,
         capNhatLuc: luc,
       }),
-    )
-    await this.ghiLichSu(nd, cv.id, 'TAO', [], luc)
+      )
+      await this.ghiLichSu(tx, nd, moi.id, 'TAO', [], luc)
+      return moi
+    })
     return sangChiTiet(cv, nd.userId, luc)
   }
 
@@ -174,16 +179,10 @@ export class CongViecService {
     }
 
     const luc = this.dongHo()
-    const moi = await this.kho.congViec.capNhat(
-      nd.congTyId,
-      id,
-      { trangThai: cv.trangThai, capNhatLuc: cv.capNhatLuc },
-      chiTruongDoi,
-      luc,
+    const moi = await this.ghiCoKhoa(cv, chiTruongDoi, luc, (tx) =>
+      // Một lần lưu = một bản ghi lịch sử, dù đổi bao nhiêu trường.
+      this.ghiLichSu(tx, nd, id, 'SUA', khacBiet, luc),
     )
-    if (!moi) throw new LoiNghiepVu('XUNG_DOT', LOI_XUNG_DOT)
-    // Một lần lưu = một bản ghi lịch sử, dù đổi bao nhiêu trường.
-    await this.ghiLichSu(nd, id, 'SUA', khacBiet, luc)
     return sangChiTiet(moi, nd.userId, luc)
   }
 
@@ -193,14 +192,16 @@ export class CongViecService {
     if (!kq.ok) throw new LoiNghiepVu(kq.code, kq.message)
 
     const luc = this.dongHo()
-    // Điều kiện trangThai cũ: hai người bấm cùng lúc (vd. duyệt và trả lại) thì chỉ một người thắng.
-    const moi = await this.kho.congViec.capNhat(nd.congTyId, id, { trangThai: cv.trangThai }, kq.capNhat, luc)
-    if (!moi) throw new LoiNghiepVu('XUNG_DOT', LOI_XUNG_DOT)
-
-    const khacBiet: ThayDoiTruong[] = [{ truong: 'trangThai', tu: cv.trangThai, den: moi.trangThai }]
-    if (moi.tienDo !== cv.tienDo) khacBiet.push({ truong: 'tienDo', tu: cv.tienDo, den: moi.tienDo })
-    const laTraLai = cv.trangThai === 'CHO_DUYET' && moi.trangThai === 'DANG_LAM'
-    await this.ghiLichSu(nd, id, 'CHUYEN_TRANG_THAI', khacBiet, luc, laTraLai ? body.lyDo?.trim() : undefined)
+    const khacBiet: ThayDoiTruong[] = [{ truong: 'trangThai', tu: cv.trangThai, den: kq.capNhat.trangThai }]
+    if (kq.capNhat.tienDo !== undefined && kq.capNhat.tienDo !== cv.tienDo) {
+      khacBiet.push({ truong: 'tienDo', tu: cv.tienDo, den: kq.capNhat.tienDo })
+    }
+    const laTraLai = cv.trangThai === 'CHO_DUYET' && kq.capNhat.trangThai === 'DANG_LAM'
+    // Khóa theo phiên bản: hai người bấm cùng lúc (vd. duyệt và trả lại) thì chỉ một người thắng,
+    // và người vừa bị gỡ vai trò không còn thao tác được trên bản cũ.
+    const moi = await this.ghiCoKhoa(cv, kq.capNhat, luc, (tx) =>
+      this.ghiLichSu(tx, nd, id, 'CHUYEN_TRANG_THAI', khacBiet, luc, laTraLai ? body.lyDo?.trim() : undefined),
+    )
     return sangChiTiet(moi, nd.userId, luc)
   }
 
@@ -216,9 +217,10 @@ export class CongViecService {
     if (body.tienDo === cv.tienDo) return sangChiTiet(cv, nd.userId, this.dongHo())
 
     const luc = this.dongHo()
-    const moi = await this.kho.congViec.capNhat(nd.congTyId, id, { trangThai: 'DANG_LAM' }, { tienDo: body.tienDo }, luc)
-    if (!moi) throw new LoiNghiepVu('XUNG_DOT', LOI_XUNG_DOT)
-    await this.ghiLichSu(nd, id, 'CAP_NHAT_TIEN_DO', [{ truong: 'tienDo', tu: cv.tienDo, den: body.tienDo }], luc)
+    // Khóa theo phiên bản để giá trị "từ" trong lịch sử luôn đúng khi hai người cùng cập nhật.
+    const moi = await this.ghiCoKhoa(cv, { tienDo: body.tienDo }, luc, (tx) =>
+      this.ghiLichSu(tx, nd, id, 'CAP_NHAT_TIEN_DO', [{ truong: 'tienDo', tu: cv.tienDo, den: body.tienDo }], luc),
+    )
     return sangChiTiet(moi, nd.userId, luc)
   }
 
@@ -232,13 +234,37 @@ export class CongViecService {
       throw new LoiNghiepVu('TRANG_THAI_KHONG_HOP_LE', 'Không xóa được công việc đã hoàn thành')
     }
     const luc = this.dongHo()
-    const moi = await this.kho.congViec.capNhat(nd.congTyId, id, { trangThai: cv.trangThai }, { deletedAt: luc }, luc)
-    if (!moi) throw new LoiNghiepVu('XUNG_DOT', LOI_XUNG_DOT)
-    await this.ghiLichSu(nd, id, 'XOA', [{ truong: 'deletedAt', tu: null, den: luc.toISOString() }], luc)
+    await this.ghiCoKhoa(cv, { deletedAt: luc }, luc, (tx) =>
+      this.ghiLichSu(tx, nd, id, 'XOA', [{ truong: 'deletedAt', tu: null, den: luc.toISOString() }], luc),
+    )
     return { id }
   }
 
   // ---------- Hỗ trợ ----------
+
+  /**
+   * Ghi thay đổi với điều kiện trạng thái và phiên bản vẫn như lúc đọc, rồi ghi lịch sử, tất cả trong
+   * một giao dịch. Có người ghi chen vào giữa thì trả XUNG_DOT và không ghi gì cả.
+   */
+  private async ghiCoKhoa(
+    cv: CongViecBanGhi,
+    thayDoi: ThayDoiCongViec,
+    luc: Date,
+    ghiThem: (tx: KhoDuLieu) => Promise<void>,
+  ): Promise<CongViecBanGhi> {
+    return this.kho.giaoDich(async (tx) => {
+      const moi = await tx.congViec.capNhat(
+        cv.congTyId,
+        cv.id,
+        { trangThai: cv.trangThai, phienBan: cv.phienBan },
+        thayDoi,
+        luc,
+      )
+      if (!moi) throw new LoiNghiepVu('XUNG_DOT', LOI_XUNG_DOT)
+      await ghiThem(tx)
+      return moi
+    })
+  }
 
   /**
    * Lấy công việc mà người này có liên quan. Không tồn tại, khác công ty, đã xóa, hoặc không
@@ -286,6 +312,7 @@ export class CongViecService {
   }
 
   private ghiLichSu(
+    kho: KhoDuLieu,
     nd: NguoiDung,
     congViecId: string,
     hanhDong: HanhDongLichSu,
@@ -293,7 +320,7 @@ export class CongViecService {
     luc: Date,
     lyDo?: string,
   ): Promise<void> {
-    return this.kho.lichSu.ghi(
+    return kho.lichSu.ghi(
       boUndefined({ congTyId: nd.congTyId, congViecId, nguoiDoiId: nd.userId, luc, hanhDong, thayDoi, lyDo }),
     )
   }

@@ -2,6 +2,8 @@ import type { CongViec, HanhDongLichSu, ThayDoiTruong } from '@longdo/contracts'
 
 /** Bản ghi công việc như đang lưu (trước khi tính quaHan, ngày giờ là Date). */
 export type CongViecBanGhi = Omit<CongViec, 'quaHan' | 'taoLuc' | 'capNhatLuc'> & {
+  /** Tăng 1 sau mỗi lần ghi; khóa lạc quan nội bộ, không trả ra API. */
+  phienBan: number
   taoLuc: Date
   capNhatLuc: Date
   deletedAt?: Date

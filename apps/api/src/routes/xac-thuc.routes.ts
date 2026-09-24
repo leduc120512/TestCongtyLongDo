@@ -13,7 +13,7 @@ export function xacThucRoutes(danhMuc: DanhMucService) {
     app.post('/xac-thuc/dang-nhap-gia-lap', async (req): Promise<PhanHoi<KetQuaDangNhap>> => {
       const body = kiemTra(DangNhapGiaLapSchema, req.body)
       const { nhanVien, payload } = await danhMuc.dangNhapGiaLap(body.userId)
-      const token = app.jwt.sign(payload, { expiresIn: '12h' })
+      const token = app.jwt.sign(payload)
       return { data: { token, nhanVien } }
     })
   }

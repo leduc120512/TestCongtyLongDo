@@ -1,13 +1,17 @@
 import { MongoClient, type Db } from 'mongodb'
 
-export type KetNoiDb = { client: MongoClient; db: Db }
+export type KetNoiDb = { client: MongoClient; db: Db; coGiaoDich: boolean }
 
 export async function moKetNoi(url: string): Promise<KetNoiDb> {
   // ignoreUndefined: lưới an toàn cuối cùng để không bao giờ ghi trường undefined vào Mongo.
   // Repository vẫn tự bỏ undefined (xem bo-undefined.ts), không dựa hoàn toàn vào cờ này.
   const client = new MongoClient(url, { ignoreUndefined: true, serverSelectionTimeoutMS: 5000 })
   await client.connect()
-  return { client, db: client.db() }
+  const db = client.db()
+  // Transaction chỉ chạy được trên replica set hoặc mongos.
+  const hello = await db.admin().command({ hello: 1 })
+  const coGiaoDich = Boolean(hello.setName) || hello.msg === 'isdbgrid'
+  return { client, db, coGiaoDich }
 }
 
 export const TEN_BANG = {
@@ -42,7 +46,7 @@ export async function taoIndex(db: Db): Promise<void> {
     ),
     db
       .collection(TEN_BANG.lichSu)
-      .createIndex({ congTyId: 1, congViecId: 1, luc: -1 }, { name: 'lich_su_theo_viec' }),
+      .createIndex({ congTyId: 1, congViecId: 1, luc: -1, _id: -1 }, { name: 'lich_su_theo_viec_luc' }),
     db
       .collection(TEN_BANG.nhanVien)
       .createIndex({ congTyId: 1, ten: 1 }, { name: 'nhan_vien_theo_cong_ty', collation: { locale: 'vi' } }),

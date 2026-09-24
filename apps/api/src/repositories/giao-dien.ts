@@ -31,8 +31,8 @@ export type BoLocCongViec = {
 export type DieuKienCapNhat = {
   /** Chỉ cập nhật nếu trạng thái hiện tại đúng bằng giá trị này. */
   trangThai?: TrangThai
-  /** Chỉ cập nhật nếu chưa ai sửa kể từ lần đọc (khóa lạc quan). */
-  capNhatLuc?: Date
+  /** Chỉ cập nhật nếu phiên bản vẫn là giá trị đã đọc (khóa lạc quan). Mỗi lần ghi tăng phiên bản 1. */
+  phienBan?: number
 }
 
 export interface CongViecRepository {
@@ -84,4 +84,9 @@ export type KhoDuLieu = {
   lichSu: LichSuRepository
   nhanVien: NhanVienRepository
   duAn: DuAnRepository
+  /**
+   * Chạy nhiều thao tác ghi như một khối: hoặc tất cả được lưu, hoặc không gì cả
+   * (ghi công việc + ghi lịch sử + tăng bộ đếm mã). fn nhận một kho gắn với giao dịch đó.
+   */
+  giaoDich<T>(fn: (kho: KhoDuLieu) => Promise<T>): Promise<T>
 }

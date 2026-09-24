@@ -2,15 +2,24 @@ services:
   mongo:
     image: mongo:7
     container_name: longdo-mongo
+    # Replica set một node: cần để dùng transaction (ghi công việc + lịch sử + bộ đếm mã nguyên tử).
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
       - longdo-mongo-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      # Lần đầu khởi tạo replica set; chỉ báo "healthy" khi node đã là primary (ghi được).
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { rs.status() } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] }) }; if (!db.hello().isWritablePrimary) quit(1)"
+      interval: 3s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
 
 volumes:
   longdo-mongo-data:

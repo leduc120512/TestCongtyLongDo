@@ -141,7 +141,7 @@ const DUONG_DI: Record<TrangThai, TrangThai[]> = {
 }
 
 async function main() {
-  const { client, db } = await moKetNoi(cauHinh.mongoUrl)
+  const { client, db, coGiaoDich } = await moKetNoi(cauHinh.mongoUrl)
   try {
     await Promise.all(
       Object.values(TEN_BANG).map((ten) => db.collection(ten).drop().catch(() => undefined)),
@@ -157,7 +157,7 @@ async function main() {
       DU_AN.map((d) => ({ _id: new ObjectId(d.id), congTyId, ma: d.ma, ten: d.ten })),
     )
 
-    const service = new CongViecService(taoKhoMongo(db))
+    const service = new CongViecService(taoKhoMongo(client, db, coGiaoDich))
     const homNay = homNayVN()
     for (const mau of danhSachViecMau(homNay)) {
       const giao: NguoiDung = { userId: mau.nguoiGiao, congTyId: CONG_TY_ID }

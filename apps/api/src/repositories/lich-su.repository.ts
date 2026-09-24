@@ -1,5 +1,5 @@
 import type { HanhDongLichSu, ThayDoiTruong } from '@longdo/contracts'
-import { ObjectId, type Collection, type Db } from 'mongodb'
+import { ObjectId, type ClientSession, type Collection, type Db } from 'mongodb'
 import { boUndefined } from '../db/bo-undefined.ts'
 import { TEN_BANG } from '../db/ket-noi.ts'
 import { sangObjectId } from '../db/object-id.ts'
@@ -33,9 +33,11 @@ function sangBanGhi(d: LichSuDoc): LichSuBanGhi {
 
 export class MongoLichSuRepository implements LichSuRepository {
   private readonly col: Collection<LichSuDoc>
+  private readonly session: ClientSession | undefined
 
-  constructor(db: Db) {
+  constructor(db: Db, session?: ClientSession) {
     this.col = db.collection<LichSuDoc>(TEN_BANG.lichSu)
+    this.session = session
   }
 
   async ghi(banGhi: LichSuMoi): Promise<void> {
@@ -54,6 +56,7 @@ export class MongoLichSuRepository implements LichSuRepository {
         thayDoi: banGhi.thayDoi,
         lyDo: banGhi.lyDo,
       }),
+      { session: this.session },
     )
   }
 
@@ -61,7 +64,9 @@ export class MongoLichSuRepository implements LichSuRepository {
     const ct = sangObjectId(congTyId)
     const cv = sangObjectId(congViecId)
     if (!ct || !cv) return []
-    const docs = await this.col.find({ congTyId: ct, congViecId: cv }).sort({ luc: -1, _id: -1 }).toArray()
+    const docs = await this.col.find({ congTyId: ct, congViecId: cv }, { session: this.session })
+      .sort({ luc: -1, _id: -1 })
+      .toArray()
     return docs.map(sangBanGhi)
   }
 }
