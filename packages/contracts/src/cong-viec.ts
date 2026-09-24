@@ -48,7 +48,11 @@ export type SapXep = z.infer<typeof SapXepSchema>
 
 // ---------- Body tạo / sửa ----------
 
-const TruongNhapSchema = z.object({
+/**
+ * Trường gốc KHÔNG có .default(): Zod 4 vẫn áp default bên trong .partial(), nên nếu schema sửa
+ * dựng từ schema có default thì PATCH thiếu trường sẽ bị điền mặc định và ghi đè dữ liệu thật.
+ */
+const TruongNhapGoc = z.object({
   ten: z
     .string({ error: 'Tên công việc không được để trống' })
     .trim()
@@ -59,8 +63,8 @@ const TruongNhapSchema = z.object({
   nguoiThucHienIds: z
     .array(IdSchema, { error: 'Cần ít nhất một người thực hiện' })
     .min(1, 'Cần ít nhất một người thực hiện'),
-  nguoiTheoDoiIds: z.array(IdSchema).default([]),
-  uuTien: UuTienSchema.default('BINH_THUONG'),
+  nguoiTheoDoiIds: z.array(IdSchema, { error: 'Danh sách người theo dõi không hợp lệ' }),
+  uuTien: UuTienSchema,
   batDau: NgaySchema.nullish(),
   hetHan: NgaySchema.nullish(),
 })
@@ -78,7 +82,10 @@ function kiemTraHan(d: CoHan, ctx: z.RefinementCtx) {
   }
 }
 
-export const TaoCongViecSchema = TruongNhapSchema.superRefine(kiemTraHan)
+export const TaoCongViecSchema = TruongNhapGoc.extend({
+  nguoiTheoDoiIds: TruongNhapGoc.shape.nguoiTheoDoiIds.default([]),
+  uuTien: UuTienSchema.default('BINH_THUONG'),
+}).superRefine(kiemTraHan)
 export type TaoCongViec = z.output<typeof TaoCongViecSchema>
 export type TaoCongViecInput = z.input<typeof TaoCongViecSchema>
 
@@ -86,7 +93,7 @@ export type TaoCongViecInput = z.input<typeof TaoCongViecSchema>
  * PATCH: trường không gửi = giữ nguyên; gửi null = xóa giá trị (bỏ hạn, bỏ dự án...).
  * Kiểm tra hạn so với giá trị đang lưu (khi chỉ gửi một trong hai) do service làm.
  */
-export const SuaCongViecSchema = TruongNhapSchema.partial().superRefine(kiemTraHan)
+export const SuaCongViecSchema = TruongNhapGoc.partial().superRefine(kiemTraHan)
 export type SuaCongViec = z.output<typeof SuaCongViecSchema>
 export type SuaCongViecInput = z.input<typeof SuaCongViecSchema>
 
@@ -96,8 +103,9 @@ export const ChuyenTrangThaiSchema = z.object({
 })
 export type ChuyenTrangThai = z.infer<typeof ChuyenTrangThaiSchema>
 
+// Body JSON đã mang kiểu số: không dùng coerce (coerce biến null, "", true thành 0/1 và lọt validate).
 export const CapNhatTienDoSchema = z.object({
-  tienDo: z.coerce
+  tienDo: z
     .number({ error: 'Tiến độ phải là số' })
     .int('Tiến độ phải là số nguyên')
     .min(0, 'Tiến độ từ 0 đến 100')
@@ -109,7 +117,14 @@ export type CapNhatTienDo = z.infer<typeof CapNhatTienDoSchema>
 
 export const DanhSachCongViecQuerySchema = PhanTrangQuerySchema.extend({
   nhanh: LocNhanhSchema.default('TAT_CA'),
-  duAnId: z.string().trim().min(1).optional(),
+  /** Id dự án, hoặc "CHUNG" = chỉ việc chung. */
+  duAnId: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((v) => v === DU_AN_CHUNG.toLowerCase() || /^[0-9a-f]{24}$/.test(v), 'Dự án không hợp lệ')
+    .transform((v) => (v === DU_AN_CHUNG.toLowerCase() ? DU_AN_CHUNG : v))
+    .optional(),
   trangThai: LocTrangThaiSchema.optional(),
   uuTien: UuTienSchema.optional(),
   q: z.string().trim().max(100, 'Từ khóa tối đa 100 ký tự').optional(),

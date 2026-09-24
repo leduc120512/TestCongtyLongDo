@@ -9,7 +9,12 @@ export const NgaySchema = z
     return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s)
   }, 'Ngày không hợp lệ')
 
-export const IdSchema = z.string().trim().min(1, 'Thiếu id')
+/** Id dạng ObjectId (24 ký tự hex), chuẩn hóa chữ thường để so sánh chuỗi luôn đúng. */
+export const IdSchema = z
+  .string({ error: 'Thiếu id' })
+  .trim()
+  .toLowerCase()
+  .regex(/^[0-9a-f]{24}$/, 'Id không hợp lệ')
 
 export const PhanTrangQuerySchema = z.object({
   page: z.coerce.number().int('Trang phải là số nguyên').min(1, 'Trang nhỏ nhất là 1').default(1),
