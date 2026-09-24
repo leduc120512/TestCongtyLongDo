@@ -1,5 +1,5 @@
 import type { MaLoi, PhanHoiLoi } from '@longdo/contracts'
-import { datPhien, layPhien } from '../auth/phien'
+import { datPhien, layPhien } from '../auth/session'
 
 /** Lỗi từ API, giữ nguyên code và message tiếng Việt server trả về. */
 export class LoiApi extends Error {

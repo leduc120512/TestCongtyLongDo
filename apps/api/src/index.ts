@@ -1,6 +1,6 @@
 import { taoApp } from './app.ts'
-import { cauHinh } from './cau-hinh.ts'
-import { moKetNoi, taoIndex } from './db/ket-noi.ts'
+import { cauHinh } from './config.ts'
+import { moKetNoi, taoIndex } from './db/connection.ts'
 import { taoKhoMongo } from './repositories/index.ts'
 
 const { client, db, coGiaoDich } = await moKetNoi(cauHinh.mongoUrl)

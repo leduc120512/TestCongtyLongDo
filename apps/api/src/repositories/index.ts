@@ -1,10 +1,10 @@
 import type { ClientSession, Db, MongoClient } from 'mongodb'
-import { MongoBinhLuanRepository } from './binh-luan.repository.ts'
-import { MongoBoDemRepository } from './bo-dem.repository.ts'
-import { MongoCongViecRepository } from './cong-viec.repository.ts'
-import { MongoDuAnRepository, MongoNhanVienRepository } from './danh-muc.repository.ts'
-import type { KhoDuLieu } from './giao-dien.ts'
-import { MongoLichSuRepository } from './lich-su.repository.ts'
+import { MongoBinhLuanRepository } from './comment.repository.ts'
+import { MongoBoDemRepository } from './counter.repository.ts'
+import { MongoCongViecRepository } from './task.repository.ts'
+import { MongoDuAnRepository, MongoNhanVienRepository } from './catalog.repository.ts'
+import type { KhoDuLieu } from './interfaces.ts'
+import { MongoLichSuRepository } from './history.repository.ts'
 
 /**
  * Tạo kho dữ liệu Mongo. Nếu Mongo chạy replica set (docker-compose của repo), giaoDich dùng transaction

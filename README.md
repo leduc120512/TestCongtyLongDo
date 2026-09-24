@@ -30,13 +30,13 @@ Cấu hình tùy chọn: sao chép `apps/api/.env.example` thành `apps/api/.env
 ## Cấu trúc
 
 ```
-packages/contracts/src/   chung.ts (id, ngày, phân trang, mã lỗi) · cong-viec.ts · xac-thuc.ts ...
+packages/contracts/src/   common.ts (id, ngày, phân trang, mã lỗi) · task.ts · auth.ts ...
 apps/api/src/
   routes/        chỉ validate bằng schema contracts → gọi service → bọc { data }
-  services/      nghiệp vụ + quyền; nghiep-vu/*.ts là luật thuần (trạng thái, quyền, quá hạn, việc con)
-  repositories/  nơi duy nhất truy vấn Mongo; giao-dien.ts là hợp đồng service ↔ repository
+  services/      nghiệp vụ + quyền; domain/*.ts là luật thuần (trạng thái, quyền, quá hạn, việc con)
+  repositories/  nơi duy nhất truy vấn Mongo; interfaces.ts là hợp đồng service ↔ repository
   db/            kết nối, index, tiện ích ObjectId / bỏ undefined
-apps/api/test/   nghiep-vu/ (không cần Mongo) · tich-hop/ (HTTP thật + Mongo thật)
+apps/api/test/   unit/ (không cần Mongo) · integration/ (HTTP thật + Mongo thật)
 apps/web/src/    pages → hooks (TanStack Query) → api (fetch); components dùng chung
 .claude/         hook, skill, subagent cho Claude Code (xem cuối file)
 ```
@@ -130,7 +130,7 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 - **Nhẹ:** API không cần `tsx` hay bước build, vì Node ≥ 22.18 tự bỏ kiểu TS. tsconfig bật `erasableSyntaxOnly` để bảo đảm điều đó. Web tách chunk theo trang (`React.lazy`), không dùng thư viện UI, chỉ CSS thuần.
 - **Index:** 3 index danh sách theo vai trò, sắp theo ESR (bằng → sắp xếp → khoảng). "Tất cả" là `$or` của 3 nhánh, bộ lọc phụ đưa vào từng nhánh, nên Mongo dùng `SORT_MERGE` trên index thay vì sắp xếp trong bộ nhớ.
 - **Không ghi `undefined`:** `boUndefined` khi tạo; trong thay đổi, `null` nghĩa là `$unset`. Driver cũng bật `ignoreUndefined` làm lưới an toàn. Có test đọc thẳng document Mongo để kiểm tra.
-- **Kiểm thử:** 154 test. `nghiep-vu/` gồm luật thuần, contracts, service với kho trong bộ nhớ, và việc con/bình luận. `tich-hop/` là HTTP thật trên Mongo thật: quyền, dạng response, index (`explain`), transaction, đồng thời.
+- **Kiểm thử:** 154 test. `unit/` gồm luật thuần, contracts, service với kho trong bộ nhớ, và việc con/bình luận. `integration/` là HTTP thật trên Mongo thật: quyền, dạng response, index (`explain`), transaction, đồng thời.
 
 ## Claude Code trong repo (`.claude/`)
 
@@ -138,11 +138,11 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 |---|---|
 | `CLAUDE.md` | Luật cho phiên Claude mới: phân tầng, dạng response, xóa mềm, múi giờ, quyền theo công ty, lệnh kiểm tra, việc cấm. |
 | `settings.json` | Chỉ cho phép sẵn đúng các lệnh đọc/kiểm tra; commit, seed, cài gói phải hỏi; cấm đọc `.env`, `git push`, `reset --hard`. |
-| `hooks/chan-hanh-dong-nguy-hiem.mjs` | PreToolUse: chặn lệnh không hoàn tác được và đọc/ghi `.env`. Chạy `node .claude/hooks/kiem-thu-hook.mjs` để thử 47 ca. |
-| `hooks/kiem-tra-truoc-khi-xong.mjs` | Stop: còn file `.ts` thay đổi (kể cả file mới chưa theo dõi) mà typecheck lỗi thì không cho Claude kết thúc lượt. Có chống vòng lặp. |
-| `skills/kiem-tra` | `/kiem-tra`: chạy kiểm tra và rà checklist luật trước khi báo xong. |
-| `skills/them-truong-cong-viec` | `/them-truong-cong-viec`: quy trình thêm trường xuyên các tầng, có bước tương thích ngược. |
-| `agents/soat-luat-du-an.md` | Subagent chỉ đọc, soát diff theo luật repo, dùng làm góc nhìn độc lập trước khi commit. |
+| `hooks/block-dangerous-actions.mjs` | PreToolUse: chặn lệnh không hoàn tác được và đọc/ghi `.env`. Chạy `node .claude/hooks/test-hooks.mjs` để thử 47 ca. |
+| `hooks/typecheck-before-stop.mjs` | Stop: còn file `.ts` thay đổi (kể cả file mới chưa theo dõi) mà typecheck lỗi thì không cho Claude kết thúc lượt. Có chống vòng lặp. |
+| `skills/verify` | `/verify`: chạy kiểm tra và rà checklist luật trước khi báo xong. |
+| `skills/add-task-field` | `/add-task-field`: quy trình thêm trường xuyên các tầng, có bước tương thích ngược. |
+| `agents/rules-reviewer.md` | Subagent chỉ đọc, soát diff theo luật repo, dùng làm góc nhìn độc lập trước khi commit. |
 
 ## Xử lý sự cố
 

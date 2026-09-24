@@ -15,7 +15,7 @@
       "Bash(pnpm --filter @longdo/api run typecheck)",
       "Bash(pnpm --filter @longdo/web run typecheck)",
       "Bash(pnpm --filter @longdo/web run build)",
-      "Bash(node .claude/hooks/kiem-thu-hook.mjs)"
+      "Bash(node .claude/hooks/test-hooks.mjs)"
     ],
     "ask": [
       "Bash(git commit:*)",
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/chan-hanh-dong-nguy-hiem.mjs",
+            "command": "node .claude/hooks/block-dangerous-actions.mjs",
             "timeout": 10
           }
         ]
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/kiem-tra-truoc-khi-xong.mjs",
+            "command": "node .claude/hooks/typecheck-before-stop.mjs",
             "timeout": 200
           }
         ]

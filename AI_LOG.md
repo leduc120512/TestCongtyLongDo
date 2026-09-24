@@ -2,13 +2,15 @@
 
 Công cụ: Claude Code (desktop). Dưới đây là 6 lần làm việc đáng kể nhất, theo thứ tự thời gian. Lần 3, 4 và 6 là những lần **AI làm sai** và bị phát hiện.
 
+> Sau các lần dưới đây, tên thư mục và tên file đã đổi sang tiếng Anh (vd. `services/nghiep-vu/` → `services/domain/`, `kiem-thu-hook.mjs` → `test-hooks.mjs`). Đường dẫn trong nhật ký đã cập nhật theo tên mới.
+
 ---
 
 ## 1. Dựng khung và luật nghiệp vụ thuần
 
 **Muốn gì.** Có khung monorepo đúng yêu cầu (contracts, api, web), với luật trạng thái, quyền và quá hạn tách thành hàm thuần để test dễ.
 
-**Ra lệnh thế nào.** Dán toàn bộ đề bài và yêu cầu làm đúng công nghệ của đề. Nói rõ ràng buộc: route → service → repository; userId/congTyId chỉ lấy từ token; không ghi undefined; múi giờ VN. Yêu cầu tách `services/nghiep-vu/*.ts` không I/O.
+**Ra lệnh thế nào.** Dán toàn bộ đề bài và yêu cầu làm đúng công nghệ của đề. Nói rõ ràng buộc: route → service → repository; userId/congTyId chỉ lấy từ token; không ghi undefined; múi giờ VN. Yêu cầu tách `services/domain/*.ts` không I/O.
 
 **AI trả về.**
 - Workspace pnpm; schema Zod trong `packages/contracts`.
@@ -125,9 +127,9 @@ Công cụ: Claude Code (desktop). Dưới đây là 6 lần làm việc đáng 
 - Lần 3: hook chặn lệnh sửa file test chỉ vì trong code có chuỗi `deleteMany({})`. Sửa: chỉ chặn xóa dữ liệu khi lệnh thực sự gửi tới Mongo (`mongosh`, `docker exec`).
 - Lần 4, sai theo chiều ngược lại (chặn thiếu): workflow soát cuối chạy thử hook và thấy các biến thể `rm -Rf`, `rm -r -f`, PowerShell `Remove-Item -r -fo`, commit với `-n` (viết tắt của `--no-verify`) đều lọt. 33 ca thử cũ vẫn đạt vì không có ca nào thuộc các dạng này. Sửa regex, thêm 14 ca.
 
-**Nhận, sửa hay bỏ.** Nhận cách tiếp cận, nhưng phải sửa 3 lần. Mỗi lần chặn nhầm đều thành một ca thử mới trong `.claude/hooks/kiem-thu-hook.mjs`, để lỗi cũ không quay lại.
+**Nhận, sửa hay bỏ.** Nhận cách tiếp cận, nhưng phải sửa 3 lần. Mỗi lần chặn nhầm đều thành một ca thử mới trong `.claude/hooks/test-hooks.mjs`, để lỗi cũ không quay lại.
 
 **Kiểm lại.**
-- `node .claude/hooks/kiem-thu-hook.mjs`: 47 ca chặn/cho phép đều đạt.
+- `node .claude/hooks/test-hooks.mjs`: 47 ca chặn/cho phép đều đạt.
 - Hook có hiệu lực ngay trong phiên làm bài: nó đã chặn thật lệnh thử có chứa `git reset --hard`. Đây là bằng chứng hook chắc chắn hơn lời dặn.
 - Bài học: ca thử chứa mẫu cấm phải để trong file, vì đưa thẳng lên dòng lệnh thì chính hook sẽ chặn.

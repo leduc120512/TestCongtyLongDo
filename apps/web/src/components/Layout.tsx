@@ -1,7 +1,7 @@
 import { Link, Outlet } from 'react-router'
-import { usePhien } from '../auth/phien'
-import { useDangNhapGiaLap, useNguoiDungGiaLap } from '../hooks/useDanhMuc'
-import { CoLoi, DangTai, KhongCoDuLieu } from './TrangThaiTai'
+import { usePhien } from '../auth/session'
+import { useDangNhapGiaLap, useNguoiDungGiaLap } from '../hooks/useCatalog'
+import { CoLoi, DangTai, KhongCoDuLieu } from './LoadingState'
 
 /** Ô chọn "Đang đăng nhập là ai" — thay cho đăng nhập thật trong bản demo. */
 function ChonNguoiDangNhap() {

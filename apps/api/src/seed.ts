@@ -1,11 +1,11 @@
 import type { NguoiDung, TaoCongViec, TrangThai } from '@longdo/contracts'
 import { ObjectId } from 'mongodb'
-import { cauHinh } from './cau-hinh.ts'
-import { moKetNoi, TEN_BANG, taoIndex } from './db/ket-noi.ts'
+import { cauHinh } from './config.ts'
+import { moKetNoi, TEN_BANG, taoIndex } from './db/connection.ts'
 import { taoKhoMongo } from './repositories/index.ts'
-import type { DuAnDoc, NhanVienDoc } from './repositories/danh-muc.repository.ts'
-import { CongViecService } from './services/cong-viec.service.ts'
-import { homNayVN } from './services/nghiep-vu/thoi-gian.ts'
+import type { DuAnDoc, NhanVienDoc } from './repositories/catalog.repository.ts'
+import { CongViecService } from './services/task.service.ts'
+import { homNayVN } from './services/domain/time.ts'
 
 /**
  * Seed lại toàn bộ dữ liệu demo. Id cố định để token đã lưu trên trình duyệt vẫn dùng được sau khi seed lại.

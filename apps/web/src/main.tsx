@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Link, Navigate, RouterProvider, useRouteError } from 'react-router'
 import { LoiApi } from './api/http'
 import { Layout } from './components/Layout'
-import { DangTai, KhongCoDuLieu } from './components/TrangThaiTai'
+import { DangTai, KhongCoDuLieu } from './components/LoadingState'
 import './styles.css'
 
 const queryClient = new QueryClient({
@@ -47,10 +47,10 @@ const router = createBrowserRouter([
     errorElement: <LoiTrang />,
     children: [
       { index: true, element: <Navigate to="/cong-viec" replace /> },
-      { path: 'cong-viec', element: trangLuoi(() => import('./pages/DanhSachPage')) },
-      { path: 'cong-viec/tao', element: trangLuoi(() => import('./pages/TaoPage')) },
-      { path: 'cong-viec/:id', element: trangLuoi(() => import('./pages/ChiTietPage')) },
-      { path: 'cong-viec/:id/sua', element: trangLuoi(() => import('./pages/SuaPage')) },
+      { path: 'cong-viec', element: trangLuoi(() => import('./pages/ListPage')) },
+      { path: 'cong-viec/tao', element: trangLuoi(() => import('./pages/CreatePage')) },
+      { path: 'cong-viec/:id', element: trangLuoi(() => import('./pages/DetailPage')) },
+      { path: 'cong-viec/:id/sua', element: trangLuoi(() => import('./pages/EditPage')) },
       {
         path: '*',
         element: (
