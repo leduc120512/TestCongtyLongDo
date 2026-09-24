@@ -12,7 +12,8 @@ export default function SuaPage() {
 
   if (ct.isPending) return <DangTai />
   if (ct.isError) {
-    if (ct.error instanceof LoiApi && ct.error.status === 404) {
+    // 404: không tồn tại / không liên quan; 400: id sai định dạng — thử lại cũng vô ích.
+    if (ct.error instanceof LoiApi && (ct.error.status === 404 || ct.error.status === 400)) {
       return (
         <KhongCoDuLieu>
           Không tìm thấy công việc. <Link to="/cong-viec">Về danh sách</Link>
