@@ -143,6 +143,12 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 | `skills/them-truong-cong-viec` | `/them-truong-cong-viec`: quy trình thêm trường xuyên các tầng, có bước tương thích ngược. |
 | `agents/soat-luat-du-an.md` | Subagent chỉ đọc, soát diff theo luật repo, dùng làm góc nhìn độc lập trước khi commit. |
 
+## Xử lý sự cố
+
+- **Cổng 27017 đã có Mongo khác chạy**: tắt Mongo đó, hoặc đổi cổng trong `docker-compose.yml` và `MONGO_URL` trong `apps/api/.env`.
+- **API cảnh báo "không chạy replica set"**: đang trỏ tới mongod đơn lẻ. Dùng Mongo của `docker compose` trong repo để có transaction.
+- **Sửa `packages/contracts` mà web chưa nhận**: tắt rồi chạy lại `pnpm dev` để Vite dịch lại gói dùng chung.
+
 ## Thời gian
 
 Tổng số giờ thực tế đã làm: **… giờ** (ứng viên tự điền).

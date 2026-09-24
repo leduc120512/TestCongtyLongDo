@@ -17,6 +17,7 @@ description: Chạy toàn bộ kiểm tra của repo (typecheck 3 package, test 
    - [ ] Mọi truy vấn Mongo mới có `congTyId`; `userId`/`congTyId` lấy từ `req.user`, không từ body/query.
    - [ ] Response đúng dạng `{ data }` / `{ data, meta }` / `{ error: { code, message } }`.
    - [ ] Không ghi `undefined`/`null` vào Mongo; xóa là xóa mềm (`deletedAt`).
+   - [ ] Ghi công việc + lịch sử nằm trong một `kho.giaoDich` (qua `ghiCoKhoa`), không tách hai bước.
    - [ ] Ngày `batDau`/`hetHan` là chuỗi `YYYY-MM-DD` giờ VN; "hôm nay" dùng `homNayVN()`.
    - [ ] Có test cho nghiệp vụ mới.
 5. Nếu làm giao diện: mở web thử đúng luồng vừa sửa (đang tải, lỗi, trống).

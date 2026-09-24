@@ -20,7 +20,7 @@ pnpm workspace: `packages/contracts` (Zod dùng chung) · `apps/api` (Fastify 5 
 - Mongo: không ghi `undefined`/`null` (dùng `boUndefined`; trong thay đổi `null` = `$unset`). Tham chiếu lưu `ObjectId`, đổi sang chuỗi ở repository.
 - Xóa là **xóa mềm** (`deletedAt`); mọi truy vấn đọc lọc `deletedAt: { $exists: false }`. Không bao giờ `deleteOne`/`deleteMany` công việc.
 - Truy vấn danh sách mới cần index trong `db/ket-noi.ts` (thứ tự khóa: bằng → sắp xếp → khoảng).
-- Cập nhật có điều kiện (`trangThai`, `capNhatLuc`) để hai người sửa cùng lúc nhận `XUNG_DOT`, không ghi đè im lặng.
+- Mọi lệnh ghi công việc đi qua `ghiCoKhoa`: điều kiện `trangThai` + `phienBan` (khóa lạc quan, người sau nhận `XUNG_DOT`) và ghi lịch sử trong cùng `kho.giaoDich` (transaction). Không ghi công việc rồi ghi lịch sử ở hai bước rời.
 
 ## Thời gian
 - `batDau`/`hetHan` là **ngày lịch** `YYYY-MM-DD` theo giờ Việt Nam (UTC+7), lưu chuỗi. "Hôm nay" luôn dùng `homNayVN()`; cấm `new Date().toISOString().slice(0,10)` (ra ngày UTC, sai từ 0h–7h sáng).
