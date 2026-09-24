@@ -19,13 +19,27 @@ pnpm dev
 
 Mở http://localhost:5173 rồi chọn **"Đang đăng nhập là"** ở góc trên. Mỗi tab trình duyệt có thể đóng vai một người khác (phiên lưu trong `sessionStorage`), tiện thử người giao và người thực hiện cùng lúc.
 
-Kiểm tra (typecheck 3 package + 155 test; test tích hợp cần Mongo đang chạy):
+Kiểm tra (typecheck 3 package + 159 test; test tích hợp cần Mongo đang chạy):
 
 ```bash
 pnpm verify
 ```
 
 Cấu hình tùy chọn: sao chép `apps/api/.env.example` thành `apps/api/.env`. Không có file này thì dùng mặc định cho dev.
+
+## Deploy (Vercel + Render + MongoDB Atlas)
+
+Web lên Vercel, API lên Render, dữ liệu trên MongoDB Atlas (gói M0 miễn phí, sẵn replica set nên có transaction). Web vẫn gọi `/api` cùng origin, Vercel chuyển tiếp sang Render theo `apps/web/vercel.json`, nên không cần CORS.
+
+1. **Atlas:** tạo cluster M0 (nên chọn vùng Singapore), tạo user DB, mở Network Access cho `0.0.0.0/0` vì Render gói miễn phí không có IP cố định. Lấy chuỗi kết nối rồi chèn tên DB: `mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/longdo_congviec?retryWrites=true&w=majority`.
+2. **Seed Atlas một lần** từ máy. Seed xóa sạch dữ liệu, chỉ chạy lúc đầu:
+   ```powershell
+   $env:MONGO_URL="<chuỗi Atlas>"; pnpm seed
+   ```
+3. **Render:** New → Blueprint → chọn repo. `render.yaml` đã khai báo lệnh build/chạy, `HOST`, `JWT_SECRET` (Render tự sinh) và `ALLOW_MOCK_LOGIN`; Render chỉ hỏi `MONGO_URL`. Kiểm tra `https://<tên-dịch-vụ>.onrender.com/api/suc-khoe` trả `{"data":{"ok":true}}`.
+4. **Vercel:** Add New → Project → chọn repo, Root Directory là `apps/web` (Vercel tự nhận Vite và pnpm workspace). Nếu địa chỉ Render khác `longdo-congviec-api.onrender.com` thì sửa `destination` trong `apps/web/vercel.json`.
+
+Render luôn đặt `NODE_ENV=production`, nên bản demo cần `ALLOW_MOCK_LOGIN=true` mới có ô chọn người đăng nhập. Gói miễn phí của Render ngủ sau 15 phút không có truy cập; lần mở đầu tiên sau đó mất khoảng 1 phút.
 
 ## Cấu trúc
 
@@ -49,8 +63,8 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 | Method | Đường dẫn | Ai được dùng |
 |---|---|---|
 | GET | `/api/suc-khoe` | công khai (kiểm tra API còn sống) |
-| GET | `/api/xac-thuc/nguoi-dung-gia-lap` | công khai (ô chọn người); tắt khi production |
-| POST | `/api/xac-thuc/dang-nhap-gia-lap` `{ userId }` | công khai → JWT 12 giờ; tắt khi production |
+| GET | `/api/xac-thuc/nguoi-dung-gia-lap` | công khai (ô chọn người); tắt khi production, trừ khi `ALLOW_MOCK_LOGIN=true` |
+| POST | `/api/xac-thuc/dang-nhap-gia-lap` `{ userId }` | công khai → JWT 12 giờ; tắt khi production, trừ khi `ALLOW_MOCK_LOGIN=true` |
 | GET | `/api/nhan-vien`, `/api/du-an` | người trong công ty |
 | GET | `/api/cong-viec?nhanh&duAnId&trangThai&uuTien&q&sapXep&page&limit` | việc mình liên quan |
 | GET | `/api/cong-viec/dem?duAnId&trangThai&uuTien&q` | số việc ở 4 lọc nhanh |
@@ -93,7 +107,7 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 12. Việc con: người giao chỉ thêm/xóa khi chưa bắt đầu hoặc đang làm; lúc chờ duyệt phải trả lại trước. Có việc con thì tiến độ không nhập tay.
 13. Hai người cùng thao tác trên một công việc thì người sau nhận `409 XUNG_DOT` và phải tải lại, không có chuyện ghi đè im lặng.
 14. Mongo chạy replica set một node để dùng transaction. Nếu trỏ tới mongod đơn lẻ, API vẫn chạy nhưng không có transaction và ghi cảnh báo lúc khởi động.
-15. Đăng nhập giả lập chỉ để demo: khi `NODE_ENV=production`, hai route `xac-thuc/*` trả 404 (chạy thật cần đăng nhập thật). Seed cũng từ chối chạy khi production, vì seed xóa sạch dữ liệu.
+15. Đăng nhập giả lập chỉ để demo: khi `NODE_ENV=production`, hai route `xac-thuc/*` trả 404 (chạy thật cần đăng nhập thật). Bản demo deploy bật lại bằng `ALLOW_MOCK_LOGIN=true`, và API ghi cảnh báo lúc khởi động. Seed cũng từ chối chạy khi production, vì seed xóa sạch dữ liệu.
 
 ## Câu hỏi thiết kế
 
@@ -131,7 +145,7 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 - **Nhẹ:** API không cần `tsx` hay bước build, vì Node ≥ 22.18 tự bỏ kiểu TS. tsconfig bật `erasableSyntaxOnly` để bảo đảm điều đó. Web tách chunk theo trang (`React.lazy`), không dùng thư viện UI, chỉ CSS thuần.
 - **Index:** 3 index danh sách theo vai trò, sắp theo ESR (bằng → sắp xếp → khoảng). "Tất cả" là `$or` của 3 nhánh, bộ lọc phụ đưa vào từng nhánh, nên Mongo dùng `SORT_MERGE` trên index thay vì sắp xếp trong bộ nhớ.
 - **Không ghi `undefined`:** `stripUndefined` khi tạo; trong thay đổi, `null` nghĩa là `$unset`. Driver cũng bật `ignoreUndefined` làm lưới an toàn. Có test đọc thẳng document Mongo để kiểm tra.
-- **Kiểm thử:** 155 test. `unit/` gồm luật thuần, contracts, service với kho trong bộ nhớ, và việc con/bình luận. `integration/` là HTTP thật trên Mongo thật: quyền, dạng response, index (`explain`), transaction, đồng thời.
+- **Kiểm thử:** 159 test. `unit/` gồm luật thuần, contracts, cấu hình, service với kho trong bộ nhớ, và việc con/bình luận. `integration/` là HTTP thật trên Mongo thật: quyền, dạng response, index (`explain`), transaction, đồng thời.
 
 ## Claude Code trong repo (`.claude/`)
 

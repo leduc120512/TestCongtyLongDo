@@ -1,0 +1,29 @@
+# Blueprint Render cho API: Render → New → Blueprint → chọn repo. Web deploy riêng trên Vercel (apps/web/vercel.json).
+services:
+  - type: web
+    name: longdo-congviec-api
+    runtime: node
+    region: singapore
+    plan: free
+    # Cài từ gốc repo để có workspace (packages/contracts), ghim đúng bản pnpm trong package.json.
+    # API chạy TypeScript trực tiếp nên không có bước build.
+    buildCommand: npx --yes pnpm@10.34.5 install --frozen-lockfile
+    startCommand: node apps/api/src/index.ts
+    healthCheckPath: /api/suc-khoe
+    envVars:
+      # engines ">=22.18" không có cận trên thì Render lấy bản Node mới nhất; ghim 24 cho ổn định.
+      - key: NODE_VERSION
+        value: "24"
+      # Render tự đặt PORT; HOST phải là 0.0.0.0 thì Render mới chuyển request vào được.
+      - key: HOST
+        value: "0.0.0.0"
+      # Render sinh chuỗi ngẫu nhiên 44 ký tự (code bắt buộc >= 32 khi production).
+      - key: JWT_SECRET
+        generateValue: true
+      # Render luôn đặt NODE_ENV=production; bật lại ô chọn người đăng nhập cho bản demo.
+      - key: ALLOW_MOCK_LOGIN
+        value: "true"
+      # Chuỗi kết nối MongoDB Atlas, phải có tên DB: mongodb+srv://.../longdo_congviec?...
+      # Render hỏi giá trị này lúc tạo Blueprint.
+      - key: MONGO_URL
+        sync: false

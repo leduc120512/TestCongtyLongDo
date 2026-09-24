@@ -9,7 +9,7 @@ await createIndexes(db)
 const app = await buildApp({
   store: createMongoStore(client, db, supportsTransactions),
   jwtSecret: config.jwtSecret,
-  mockLogin: !config.isProduction,
+  mockLogin: config.mockLogin,
   logger: { level: 'info' },
 })
 
@@ -23,6 +23,11 @@ process.on('SIGTERM', shutdown)
 
 if (config.usingDevSecret) {
   app.log.warn('Đang dùng JWT_SECRET mặc định cho môi trường dev. Đặt JWT_SECRET trong apps/api/.env khi chạy thật.')
+}
+if (config.isProduction && config.mockLogin) {
+  app.log.warn(
+    'Đang bật đăng nhập giả lập khi production (ALLOW_MOCK_LOGIN=true): ai có đường dẫn cũng đăng nhập được với tư cách bất kỳ nhân viên nào. Chỉ dùng cho bản demo.',
+  )
 }
 if (!supportsTransactions) {
   app.log.warn(

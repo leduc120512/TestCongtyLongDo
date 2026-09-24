@@ -14,6 +14,14 @@ if (isProduction && (jwtSecret === DEV_SECRET || jwtSecret.length < 32)) {
   throw new Error('JWT_SECRET phải được đặt (tối thiểu 32 ký tự) khi NODE_ENV=production')
 }
 
+/**
+ * Đăng nhập giả lập cấp token cho bất kỳ nhân viên nào nên production mặc định tắt.
+ * Bản demo deploy bật lại bằng ALLOW_MOCK_LOGIN=true (Render luôn đặt NODE_ENV=production cho dịch vụ Node).
+ */
+export function isMockLoginEnabled(env: Record<string, string | undefined>): boolean {
+  return env.NODE_ENV !== 'production' || env.ALLOW_MOCK_LOGIN === 'true'
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 3000),
   /** Mặc định chỉ nghe trên máy cục bộ; đặt HOST=0.0.0.0 khi cần cho máy khác truy cập. */
@@ -21,6 +29,7 @@ export const config = {
   mongoUrl: process.env.MONGO_URL ?? 'mongodb://localhost:27017/longdo_congviec?directConnection=true',
   jwtSecret,
   usingDevSecret: jwtSecret === DEV_SECRET,
-  /** Production: tắt đăng nhập giả lập (cấp token cho bất kỳ nhân viên nào) và không cho chạy seed. */
+  /** Production: không cho chạy seed (seed xóa sạch dữ liệu). */
   isProduction,
+  mockLogin: isMockLoginEnabled(process.env),
 }
