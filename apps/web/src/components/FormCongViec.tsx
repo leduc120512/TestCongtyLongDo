@@ -121,7 +121,7 @@ export function FormCongViec({
       <div className="hang">
         <div className="truong">
           <label htmlFor="batDau">Bắt đầu</label>
-          <input id="batDau" type="date" {...register('batDau')} aria-invalid={!!errors.batDau} />
+          <input id="batDau" type="date" {...register('batDau', { deps: ['hetHan'] })} aria-invalid={!!errors.batDau} />
           {errors.batDau && <p className="loi-nho">{errors.batDau.message}</p>}
         </div>
         <div className="truong">
@@ -138,7 +138,9 @@ export function FormCongViec({
       </div>
 
       <div className="truong">
-        <label htmlFor="nguoiThucHienIds">Người thực hiện * (ít nhất 1 người)</label>
+        <span className="nhan-truong" id="nguoiThucHienIds-nhan">
+          Người thực hiện * (ít nhất 1 người)
+        </span>
         <Controller
           control={control}
           name="nguoiThucHienIds"
@@ -163,7 +165,9 @@ export function FormCongViec({
       </div>
 
       <div className="truong">
-        <label htmlFor="nguoiTheoDoiIds">Người theo dõi</label>
+        <span className="nhan-truong" id="nguoiTheoDoiIds-nhan">
+          Người theo dõi
+        </span>
         <Controller
           control={control}
           name="nguoiTheoDoiIds"

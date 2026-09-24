@@ -26,7 +26,8 @@ export async function goiApi<T>(duongDan: string, { method = 'GET', body, query 
   for (const [k, v] of Object.entries(query ?? {})) {
     if (v !== undefined && v !== '') thamSo.set(k, String(v))
   }
-  const url = `/api${duongDan}${thamSo.size ? `?${thamSo}` : ''}`
+  const chuoiQuery = thamSo.toString()
+  const url = `/api${duongDan}${chuoiQuery ? `?${chuoiQuery}` : ''}`
 
   const headers: Record<string, string> = {}
   const phien = layPhien()

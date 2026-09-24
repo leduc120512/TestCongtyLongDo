@@ -162,6 +162,14 @@ export default function ChiTietPage() {
       <p>
         <Link to="/cong-viec">‹ Danh sách</Link>
       </p>
+      {tra.loi && (
+        <p className="loi-khoi" role="alert">
+          Không tải được tên nhân viên/dự án: {tra.loi.message}{' '}
+          <button type="button" className="lien-ket" onClick={tra.thuLai}>
+            Thử lại
+          </button>
+        </p>
+      )}
       <header className="tieu-de-trang">
         <div>
           <span className="ma">{cv.ma}</span>

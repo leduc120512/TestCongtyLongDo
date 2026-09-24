@@ -15,7 +15,7 @@ export default function TaoPage() {
         dangGui={tao.isPending}
         loiMayChu={tao.error?.message}
         onGui={(duLieu) => tao.mutate(duLieu, { onSuccess: (cv) => navigate(`/cong-viec/${cv.id}`) })}
-        onHuy={() => navigate(-1)}
+        onHuy={() => navigate('/cong-viec')}
       />
     </section>
   )

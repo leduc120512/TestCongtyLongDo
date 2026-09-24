@@ -21,7 +21,13 @@ export function ChonNhieuNguoi({
     onChange(chon ? [...giaTri, nvId] : giaTri.filter((x) => x !== nvId))
 
   return (
-    <div id={id} className={`chon-nhieu${coLoi ? ' co-loi' : ''}`} role="group" aria-invalid={coLoi}>
+    <div
+      id={id}
+      className={`chon-nhieu${coLoi ? ' co-loi' : ''}`}
+      role="group"
+      aria-labelledby={`${id}-nhan`}
+      aria-invalid={coLoi}
+    >
       {nhanVien.map((nv) => {
         const biLoai = loaiTru.includes(nv.id)
         return (

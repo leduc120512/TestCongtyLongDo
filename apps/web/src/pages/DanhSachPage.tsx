@@ -9,7 +9,7 @@ import {
   type LocTrangThai,
   type UuTien,
 } from '@longdo/contracts'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { dinhDangNgay } from '../components/dinh-dang'
 import { NhanTrangThai, NhanUuTien } from '../components/NhanHieu'
@@ -26,18 +26,29 @@ export default function DanhSachPage() {
   const duAn = useDuAn()
   const tra = useTraCuu()
 
-  // Ô tìm kiếm: gõ tới đâu hiện tới đó, nhưng chỉ gọi API sau khi ngừng gõ 300ms.
+  // Ô tìm kiếm: gõ tới đâu hiện tới đó, nhưng chỉ đưa lên URL (và gọi API) sau khi ngừng gõ 300ms.
+  // daGui nhớ giá trị đã đưa lên gần nhất, để chỉ đồng bộ khi giá trị đã trễ thật sự đổi — tránh
+  // gắn lại từ khóa cũ khi vừa bấm "Xóa bộ lọc".
   const [tuKhoa, setTuKhoa] = useState(boLoc.q ?? '')
   const tuKhoaTre = useTreGiaTri(tuKhoa)
+  const daGui = useRef(boLoc.q)
   useEffect(() => {
     const q = tuKhoaTre.trim() || undefined
-    if (q !== boLoc.q) doiBoLoc({ q })
-  }, [tuKhoaTre, boLoc.q, doiBoLoc])
+    if (q !== daGui.current) {
+      daGui.current = q
+      doiBoLoc({ q })
+    }
+  }, [tuKhoaTre, doiBoLoc])
 
   const coLocPhu = !!(boLoc.duAnId || boLoc.trangThai || boLoc.uuTien || boLoc.q)
   const xoaLoc = () => {
     setTuKhoa('')
+    daGui.current = undefined
     doiBoLoc({ duAnId: undefined, trangThai: undefined, uuTien: undefined, q: undefined })
+  }
+  const thuLaiTatCa = () => {
+    void ds.refetch()
+    void dem.refetch()
   }
 
   return (
@@ -60,14 +71,32 @@ export default function DanhSachPage() {
             onClick={() => doiBoLoc({ nhanh: n })}
           >
             {TEN_LOC_NHANH[n]}
-            <span className="dem">{dem.data ? dem.data[n] : '…'}</span>
+            <span className="dem">{dem.data ? dem.data[n] : dem.isError ? '!' : '…'}</span>
           </button>
         ))}
       </div>
 
+      {dem.isError && !ds.isError && (
+        <p className="loi-khoi" role="alert">
+          Không tải được số lượng việc: {dem.error.message}{' '}
+          <button type="button" className="lien-ket" onClick={() => dem.refetch()}>
+            Thử lại
+          </button>
+        </p>
+      )}
+      {tra.loi && (
+        <p className="loi-khoi" role="alert">
+          Không tải được danh sách nhân viên/dự án: {tra.loi.message}{' '}
+          <button type="button" className="lien-ket" onClick={tra.thuLai}>
+            Thử lại
+          </button>
+        </p>
+      )}
+
       <div className="thanh-loc">
         <input
           type="search"
+          maxLength={100}
           placeholder="Tìm theo tên hoặc mã (vd. CV-0012, nghiem thu)"
           value={tuKhoa}
           onChange={(e) => setTuKhoa(e.target.value)}
@@ -121,7 +150,7 @@ export default function DanhSachPage() {
       {ds.isPending ? (
         <DangTai />
       ) : ds.isError ? (
-        <CoLoi loi={ds.error} thuLai={() => ds.refetch()} />
+        <CoLoi loi={ds.error} thuLai={thuLaiTatCa} />
       ) : ds.data.data.length === 0 ? (
         <KhongCoDuLieu>
           {coLocPhu || boLoc.page > 1 ? (

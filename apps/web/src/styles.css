@@ -381,7 +381,8 @@ button.lien-ket {
   gap: 0.3rem;
 }
 
-.truong > label {
+.truong > label,
+.truong > .nhan-truong {
   font-weight: 600;
   font-size: 0.9rem;
 }

@@ -54,7 +54,8 @@ export function Layout() {
       </header>
       <main className="noi-dung">
         {phien ? (
-          <Outlet />
+          // key theo người đăng nhập: đổi người là dựng lại trang, không giữ dữ liệu/state của người trước.
+          <Outlet key={phien.nhanVien.id} />
         ) : ds.isPending ? (
           <DangTai />
         ) : ds.isError ? (

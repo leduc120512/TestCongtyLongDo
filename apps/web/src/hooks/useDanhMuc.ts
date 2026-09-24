@@ -29,16 +29,28 @@ export function useDuAn() {
 
 /** Tra tên theo id, dùng khi hiển thị danh sách người, dự án, lịch sử. */
 export function useTraCuu() {
-  const { data: nhanVien } = useNhanVien()
-  const { data: duAn } = useDuAn()
+  const nhanVienQ = useNhanVien()
+  const duAnQ = useDuAn()
+  const nhanVien = nhanVienQ.data
+  const duAn = duAnQ.data
+  const loi = nhanVienQ.error ?? duAnQ.error
+  const { refetch: taiLaiNv } = nhanVienQ
+  const { refetch: taiLaiDa } = duAnQ
   return useMemo(() => {
     const nv = new Map<string, NhanVien>((nhanVien ?? []).map((x) => [x.id, x]))
     const da = new Map<string, DuAn>((duAn ?? []).map((x) => [x.id, x]))
+    const dangTai = !nhanVien || !duAn
     return {
-      tenNguoi: (id: string) => nv.get(id)?.ten ?? '(không rõ)',
-      tenDuAn: (id?: string | null) => (id ? (da.get(id)?.ten ?? '(không rõ)') : 'Việc chung'),
+      tenNguoi: (id: string) => nv.get(id)?.ten ?? (dangTai ? '…' : '(không rõ)'),
+      tenDuAn: (id?: string | null) => (id ? (da.get(id)?.ten ?? (dangTai ? '…' : '(không rõ)')) : 'Việc chung'),
+      /** Lỗi tải danh mục nhân viên/dự án (null nếu không lỗi). */
+      loi,
+      thuLai: () => {
+        void taiLaiNv()
+        void taiLaiDa()
+      },
     }
-  }, [nhanVien, duAn])
+  }, [nhanVien, duAn, loi, taiLaiNv, taiLaiDa])
 }
 
 export function useNguoiDungGiaLap() {
