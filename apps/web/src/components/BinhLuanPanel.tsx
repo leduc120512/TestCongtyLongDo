@@ -21,7 +21,9 @@ export function BinhLuanPanel({ congViecId }: { congViecId: string }) {
       return
     }
     setLoiNhap(undefined)
-    viet.mutate(kq.data.noiDung, { onSuccess: () => setNoiDung('') })
+    const daGui = kq.data.noiDung
+    // Chỉ xóa ô nếu người dùng chưa gõ thêm gì trong lúc chờ gửi.
+    viet.mutate(daGui, { onSuccess: () => setNoiDung((cu) => (cu.trim() === daGui ? '' : cu)) })
   }
 
   return (

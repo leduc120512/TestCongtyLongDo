@@ -20,10 +20,12 @@ function HanhDong({ cv }: { cv: ChiTietCongViec }) {
   const [giaTriTienDo, setGiaTriTienDo] = useState(cv.tienDo)
   const [lyDo, setLyDo] = useState('')
   const hopThoai = useRef<HTMLDialogElement>(null)
+  // Lỗi của thao tác gần nhất (mỗi mutation giữ error riêng nên không gộp bằng ??).
+  const [loi, setLoi] = useState<Error | null>(null)
+  const theoDoiLoi = { onError: (e: Error) => setLoi(e), onSuccess: () => setLoi(null) }
 
   const { quyen } = cv
   const dangXuLy = chuyen.isPending || tienDo.isPending || xoa.isPending
-  const loi = chuyen.error ?? tienDo.error ?? xoa.error
   const coNut = Object.values(quyen).some(Boolean)
   // Người thực hiện đang làm nhưng chưa gửi duyệt được vì còn việc con chưa xong.
   const conViecCon = quyen.danhDauViecCon && !quyen.guiDuyet ? cv.viecCon.filter((v) => !v.xong).length : 0
@@ -34,17 +36,17 @@ function HanhDong({ cv }: { cv: ChiTietCongViec }) {
     <div className="hanh-dong">
       <div className="nut-hang">
         {quyen.batDau && (
-          <button type="button" disabled={dangXuLy} onClick={() => chuyen.mutate({ trangThai: 'DANG_LAM' })}>
+          <button type="button" disabled={dangXuLy} onClick={() => chuyen.mutate({ trangThai: 'DANG_LAM' }, theoDoiLoi)}>
             Bắt đầu làm
           </button>
         )}
         {quyen.guiDuyet && (
-          <button type="button" disabled={dangXuLy} onClick={() => chuyen.mutate({ trangThai: 'CHO_DUYET' })}>
+          <button type="button" disabled={dangXuLy} onClick={() => chuyen.mutate({ trangThai: 'CHO_DUYET' }, theoDoiLoi)}>
             Gửi duyệt
           </button>
         )}
         {quyen.duyet && (
-          <button type="button" disabled={dangXuLy} onClick={() => chuyen.mutate({ trangThai: 'HOAN_THANH' })}>
+          <button type="button" disabled={dangXuLy} onClick={() => chuyen.mutate({ trangThai: 'HOAN_THANH' }, theoDoiLoi)}>
             Duyệt hoàn thành
           </button>
         )}
@@ -65,7 +67,7 @@ function HanhDong({ cv }: { cv: ChiTietCongViec }) {
             disabled={dangXuLy}
             onClick={() => {
               if (window.confirm(`Xóa công việc ${cv.ma}?`)) {
-                xoa.mutate(undefined, { onSuccess: () => navigate('/cong-viec', { replace: true }) })
+                xoa.mutate(undefined, { onError: theoDoiLoi.onError, onSuccess: () => navigate('/cong-viec', { replace: true }) })
               }
             }}
           >
@@ -83,7 +85,7 @@ function HanhDong({ cv }: { cv: ChiTietCongViec }) {
           className="tien-do-form"
           onSubmit={(e) => {
             e.preventDefault()
-            tienDo.mutate({ tienDo: giaTriTienDo })
+            tienDo.mutate({ tienDo: giaTriTienDo }, theoDoiLoi)
           }}
         >
           <label htmlFor="tienDo">Tiến độ</label>
@@ -117,7 +119,7 @@ function HanhDong({ cv }: { cv: ChiTietCongViec }) {
               e.preventDefault()
               return
             }
-            chuyen.mutate({ trangThai: 'DANG_LAM', lyDo: lyDo.trim() })
+            chuyen.mutate({ trangThai: 'DANG_LAM', lyDo: lyDo.trim() }, theoDoiLoi)
           }}
         >
           <h2>Trả lại công việc {cv.ma}</h2>

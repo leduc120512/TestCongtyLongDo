@@ -1,7 +1,7 @@
 import { Link, Outlet } from 'react-router'
 import { usePhien } from '../auth/phien'
 import { useDangNhapGiaLap, useNguoiDungGiaLap } from '../hooks/useDanhMuc'
-import { CoLoi, DangTai } from './TrangThaiTai'
+import { CoLoi, DangTai, KhongCoDuLieu } from './TrangThaiTai'
 
 /** Ô chọn "Đang đăng nhập là ai" — thay cho đăng nhập thật trong bản demo. */
 function ChonNguoiDangNhap() {
@@ -17,6 +17,8 @@ function ChonNguoiDangNhap() {
       </button>
     )
   }
+
+  if (ds.data.length === 0) return <span className="nho">Chưa có nhân viên</span>
 
   return (
     <label className="chon-nguoi">
@@ -60,6 +62,14 @@ export function Layout() {
           <DangTai />
         ) : ds.isError ? (
           <CoLoi loi={ds.error} thuLai={() => ds.refetch()} />
+        ) : ds.data.length === 0 ? (
+          <KhongCoDuLieu>
+            Chưa có nhân viên nào để đăng nhập. Chạy <code>pnpm seed</code> để tạo dữ liệu mẫu rồi{' '}
+            <button type="button" className="lien-ket" onClick={() => ds.refetch()}>
+              tải lại
+            </button>
+            .
+          </KhongCoDuLieu>
         ) : (
           <div className="chao">
             <h1>Phân hệ Công việc</h1>

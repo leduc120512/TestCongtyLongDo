@@ -13,10 +13,12 @@ export function ViecConPanel({ cv }: { cv: ChiTietCongViec }) {
   const xoa = useXoaViecCon(cv.id)
   const [ten, setTen] = useState('')
   const [loiNhap, setLoiNhap] = useState<string>()
+  // Lỗi của thao tác GẦN NHẤT (mỗi mutation giữ error riêng tới khi gọi lại, nên không gộp bằng ??).
+  const [loi, setLoi] = useState<Error | null>(null)
+  const theoDoiLoi = { onError: (e: Error) => setLoi(e), onSuccess: () => setLoi(null) }
 
   const { quanLyViecCon, danhDauViecCon } = cv.quyen
   const dangXuLy = them.isPending || danhDau.isPending || xoa.isPending
-  const loi = them.error ?? danhDau.error ?? xoa.error
   const soXong = cv.viecCon.filter((v) => v.xong).length
 
   const guiThem = (e: FormEvent) => {
@@ -28,7 +30,15 @@ export function ViecConPanel({ cv }: { cv: ChiTietCongViec }) {
       return
     }
     setLoiNhap(undefined)
-    them.mutate(kq.data.ten, { onSuccess: () => setTen('') })
+    const daGui = kq.data.ten
+    them.mutate(daGui, {
+      onError: theoDoiLoi.onError,
+      // Chỉ xóa ô nếu người dùng chưa gõ gì thêm trong lúc chờ.
+      onSuccess: () => {
+        setLoi(null)
+        setTen((cu) => (cu.trim() === daGui ? '' : cu))
+      },
+    })
   }
 
   return (
@@ -55,7 +65,7 @@ export function ViecConPanel({ cv }: { cv: ChiTietCongViec }) {
                   type="checkbox"
                   checked={v.xong}
                   disabled={!danhDauViecCon || dangXuLy}
-                  onChange={(e) => danhDau.mutate({ viecConId: v.id, xong: e.target.checked })}
+                  onChange={(e) => danhDau.mutate({ viecConId: v.id, xong: e.target.checked }, theoDoiLoi)}
                 />
                 {v.ten}
               </label>
@@ -65,7 +75,7 @@ export function ViecConPanel({ cv }: { cv: ChiTietCongViec }) {
                   className="lien-ket"
                   disabled={dangXuLy}
                   aria-label={`Xóa việc con ${v.ten}`}
-                  onClick={() => xoa.mutate(v.id)}
+                  onClick={() => xoa.mutate(v.id, theoDoiLoi)}
                 >
                   Xóa
                 </button>
