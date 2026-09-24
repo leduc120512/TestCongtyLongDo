@@ -617,3 +617,81 @@ progress {
     margin-bottom: 0.5rem;
   }
 }
+
+/* ---------- Việc con, bình luận ---------- */
+
+.khoi {
+  margin-top: 1rem;
+}
+
+.viec-con {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--the);
+  border: 1px solid var(--vien);
+  border-radius: var(--bo);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.viec-con li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.viec-con label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.viec-con .da-xong {
+  color: var(--chu-phu);
+  text-decoration: line-through;
+}
+
+.them-dong,
+.viet-bl {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  align-items: flex-start;
+}
+
+.them-dong input,
+.viet-bl textarea {
+  flex: 1;
+}
+
+.binh-luan {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.binh-luan > li {
+  background: var(--the);
+  border: 1px solid var(--vien);
+  border-radius: var(--bo);
+  padding: 0.6rem 0.9rem;
+}
+
+.mo-ta-bl {
+  margin: 0.3rem 0 0;
+  white-space: pre-wrap;
+}
+
+/* Ẩn khỏi mắt nhưng trình đọc màn hình vẫn đọc được. */
+.an {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

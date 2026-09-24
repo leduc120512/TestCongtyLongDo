@@ -20,6 +20,7 @@ export const khoaCongViec = {
   dem: (uid: string, q: BoLocDem) => ['cong-viec', uid, 'dem', q] as const,
   chiTiet: (uid: string, id: string) => ['cong-viec', uid, 'chi-tiet', id] as const,
   lichSu: (uid: string, id: string) => ['cong-viec', uid, 'lich-su', id] as const,
+  binhLuan: (uid: string, id: string) => ['cong-viec', uid, 'binh-luan', id] as const,
 }
 
 function useUid(): string {
@@ -64,7 +65,8 @@ function useSauKhiDoi() {
     qc.setQueryData(khoaCongViec.chiTiet(uid, cv.id), cv)
     void qc.invalidateQueries({
       queryKey: khoaCongViec.tatCa(uid),
-      predicate: (q) => !(q.queryKey[2] === 'chi-tiet' && q.queryKey[3] === cv.id),
+      // Bình luận không đổi khi công việc đổi nên không cần tải lại.
+      predicate: (q) => !(q.queryKey[3] === cv.id && (q.queryKey[2] === 'chi-tiet' || q.queryKey[2] === 'binh-luan')),
     })
   }
 }
@@ -104,8 +106,45 @@ export function useXoaCongViec(id: string) {
       // Bỏ hẳn chi tiết và lịch sử của việc đã xóa (tải lại chỉ nhận 404), làm mới danh sách và số đếm.
       qc.removeQueries({ queryKey: khoaCongViec.chiTiet(uid, id) })
       qc.removeQueries({ queryKey: khoaCongViec.lichSu(uid, id) })
+      qc.removeQueries({ queryKey: khoaCongViec.binhLuan(uid, id) })
       void qc.invalidateQueries({ queryKey: [...khoaCongViec.tatCa(uid), 'danh-sach'] })
       void qc.invalidateQueries({ queryKey: [...khoaCongViec.tatCa(uid), 'dem'] })
     },
+  })
+}
+
+// ---------- Việc con ----------
+
+export function useThemViecCon(id: string) {
+  const sauKhiDoi = useSauKhiDoi()
+  return useMutation({ mutationFn: (ten: string) => congViecApi.themViecCon(id, ten), onSuccess: sauKhiDoi })
+}
+
+export function useDanhDauViecCon(id: string) {
+  const sauKhiDoi = useSauKhiDoi()
+  return useMutation({
+    mutationFn: (v: { viecConId: string; xong: boolean }) => congViecApi.danhDauViecCon(id, v.viecConId, v.xong),
+    onSuccess: sauKhiDoi,
+  })
+}
+
+export function useXoaViecCon(id: string) {
+  const sauKhiDoi = useSauKhiDoi()
+  return useMutation({ mutationFn: (viecConId: string) => congViecApi.xoaViecCon(id, viecConId), onSuccess: sauKhiDoi })
+}
+
+// ---------- Bình luận ----------
+
+export function useBinhLuan(id: string) {
+  const uid = useUid()
+  return useQuery({ queryKey: khoaCongViec.binhLuan(uid, id), queryFn: () => congViecApi.binhLuan(id) })
+}
+
+export function useVietBinhLuan(id: string) {
+  const qc = useQueryClient()
+  const uid = useUid()
+  return useMutation({
+    mutationFn: (noiDung: string) => congViecApi.vietBinhLuan(id, noiDung),
+    onSuccess: () => qc.invalidateQueries({ queryKey: khoaCongViec.binhLuan(uid, id) }),
   })
 }

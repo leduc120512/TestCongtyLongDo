@@ -3,9 +3,11 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { LoiApi } from '../api/http'
 import { dinhDangLuc, dinhDangNgay } from '../components/dinh-dang'
+import { BinhLuanPanel } from '../components/BinhLuanPanel'
 import { LichSuThayDoi } from '../components/LichSuThayDoi'
 import { NhanTrangThai, NhanUuTien } from '../components/NhanHieu'
 import { CoLoi, DangTai, KhongCoDuLieu } from '../components/TrangThaiTai'
+import { ViecConPanel } from '../components/ViecConPanel'
 import { useCapNhatTienDo, useChiTietCongViec, useChuyenTrangThai, useXoaCongViec } from '../hooks/useCongViec'
 import { useTraCuu } from '../hooks/useDanhMuc'
 
@@ -23,6 +25,8 @@ function HanhDong({ cv }: { cv: ChiTietCongViec }) {
   const dangXuLy = chuyen.isPending || tienDo.isPending || xoa.isPending
   const loi = chuyen.error ?? tienDo.error ?? xoa.error
   const coNut = Object.values(quyen).some(Boolean)
+  // Người thực hiện đang làm nhưng chưa gửi duyệt được vì còn việc con chưa xong.
+  const conViecCon = quyen.danhDauViecCon && !quyen.guiDuyet ? cv.viecCon.filter((v) => !v.xong).length : 0
 
   if (!coNut) return <p className="nho">Bạn chỉ có quyền xem công việc này.</p>
 
@@ -69,6 +73,10 @@ function HanhDong({ cv }: { cv: ChiTietCongViec }) {
           </button>
         )}
       </div>
+
+      {conViecCon > 0 && (
+        <p className="nho">Còn {conViecCon} việc con chưa xong — hoàn thành hết để gửi duyệt.</p>
+      )}
 
       {quyen.capNhatTienDo && (
         <form
@@ -214,6 +222,10 @@ export default function ChiTietPage() {
           <p className="mo-ta">{cv.moTa}</p>
         </section>
       )}
+
+      <ViecConPanel cv={cv} />
+
+      <BinhLuanPanel congViecId={cv.id} />
 
       <section>
         <h2>Lịch sử thay đổi</h2>

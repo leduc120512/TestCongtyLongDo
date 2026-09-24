@@ -34,6 +34,10 @@ function hienGiaTri(truong: string, giaTri: unknown, tra: TraCuu): string {
       return `${giaTri}%`
     case 'deletedAt':
       return dinhDangLuc(giaTri as string)
+    case 'viecCon': {
+      const vc = giaTri as { ten: string; xong: boolean }
+      return `${vc.xong ? '☑' : '☐'} ${vc.ten}`
+    }
     default:
       return String(giaTri)
   }

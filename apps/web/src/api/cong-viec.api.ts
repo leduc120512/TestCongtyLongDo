@@ -1,4 +1,5 @@
 import type {
+  BinhLuan,
   CapNhatTienDo,
   ChiTietCongViec,
   ChuyenTrangThai,
@@ -39,4 +40,23 @@ export const congViecApi = {
 
   xoa: async (id: string) =>
     (await goiApi<PhanHoi<{ id: string }>>(`/cong-viec/${id}`, { method: 'DELETE' })).data,
+
+  themViecCon: async (id: string, ten: string) =>
+    (await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}/viec-con`, { method: 'POST', body: { ten } })).data,
+
+  danhDauViecCon: async (id: string, viecConId: string, xong: boolean) =>
+    (
+      await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}/viec-con/${viecConId}/danh-dau`, {
+        method: 'POST',
+        body: { xong },
+      })
+    ).data,
+
+  xoaViecCon: async (id: string, viecConId: string) =>
+    (await goiApi<PhanHoi<ChiTietCongViec>>(`/cong-viec/${id}/viec-con/${viecConId}`, { method: 'DELETE' })).data,
+
+  binhLuan: async (id: string) => (await goiApi<PhanHoi<BinhLuan[]>>(`/cong-viec/${id}/binh-luan`)).data,
+
+  vietBinhLuan: async (id: string, noiDung: string) =>
+    (await goiApi<PhanHoi<BinhLuan>>(`/cong-viec/${id}/binh-luan`, { method: 'POST', body: { noiDung } })).data,
 }
