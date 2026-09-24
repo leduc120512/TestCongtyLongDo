@@ -1,0 +1,22 @@
+{
+  "name": "longdo-cong-viec",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Phân hệ Công việc cho ERP Long Đỗ — bài test Full-stack Developer",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --stream run dev",
+    "seed": "pnpm --filter @longdo/api run seed",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm --filter @longdo/api run test",
+    "kiem-tra": "pnpm typecheck && pnpm test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
