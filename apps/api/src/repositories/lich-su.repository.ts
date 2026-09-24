@@ -1,10 +1,10 @@
 import type { HanhDongLichSu, ThayDoiTruong } from '@longdo/contracts'
 import { ObjectId, type Collection, type Db } from 'mongodb'
-import { boUndefined } from '../db/bo-undefined'
-import { TEN_BANG } from '../db/ket-noi'
-import { sangObjectId } from '../db/object-id'
-import type { LichSuBanGhi, LichSuMoi } from '../kieu'
-import type { LichSuRepository } from './giao-dien'
+import { boUndefined } from '../db/bo-undefined.ts'
+import { TEN_BANG } from '../db/ket-noi.ts'
+import { sangObjectId } from '../db/object-id.ts'
+import type { LichSuBanGhi, LichSuMoi } from '../kieu.ts'
+import type { LichSuRepository } from './giao-dien.ts'
 
 type LichSuDoc = {
   _id: ObjectId

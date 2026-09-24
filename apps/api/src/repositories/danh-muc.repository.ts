@@ -1,8 +1,11 @@
 import type { Collection, Db, ObjectId } from 'mongodb'
-import { TEN_BANG } from '../db/ket-noi'
-import { sangObjectId, sangObjectIds } from '../db/object-id'
-import type { DuAnBanGhi, NhanVienBanGhi } from '../kieu'
-import type { DuAnRepository, NhanVienRepository } from './giao-dien'
+import { TEN_BANG } from '../db/ket-noi.ts'
+import { sangObjectId, sangObjectIds } from '../db/object-id.ts'
+import type { DuAnBanGhi, NhanVienBanGhi } from '../kieu.ts'
+import type { DuAnRepository, NhanVienRepository } from './giao-dien.ts'
+
+/** Sắp xếp theo bảng chữ cái tiếng Việt. */
+const TIENG_VIET = { locale: 'vi' } as const
 
 export type NhanVienDoc = { _id: ObjectId; congTyId: ObjectId; ten: string; chucVu: string }
 export type DuAnDoc = { _id: ObjectId; congTyId: ObjectId; ma: string; ten: string }
@@ -31,11 +34,11 @@ export class MongoNhanVienRepository implements NhanVienRepository {
   async danhSach(congTyId: string): Promise<NhanVienBanGhi[]> {
     const ct = sangObjectId(congTyId)
     if (!ct) return []
-    return (await this.col.find({ congTyId: ct }).sort({ ten: 1 }).toArray()).map(nhanVienSang)
+    return (await this.col.find({ congTyId: ct }).collation(TIENG_VIET).sort({ ten: 1 }).toArray()).map(nhanVienSang)
   }
 
   async danhSachGiaLap(): Promise<NhanVienBanGhi[]> {
-    return (await this.col.find({}).sort({ congTyId: 1, ten: 1 }).limit(200).toArray()).map(nhanVienSang)
+    return (await this.col.find({}).collation(TIENG_VIET).sort({ congTyId: 1, ten: 1 }).limit(200).toArray()).map(nhanVienSang)
   }
 
   async timTheoId(id: string): Promise<NhanVienBanGhi | null> {

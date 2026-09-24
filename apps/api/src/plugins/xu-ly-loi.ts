@@ -1,6 +1,6 @@
 import type { MaLoi, PhanHoiLoi } from '@longdo/contracts'
 import type { FastifyError, FastifyInstance } from 'fastify'
-import { LoiNghiepVu } from '../loi'
+import { LoiNghiepVu } from '../loi.ts'
 
 function loi(code: MaLoi, message: string): PhanHoiLoi {
   return { error: { code, message } }

@@ -1,9 +1,9 @@
 import type { Db } from 'mongodb'
-import { MongoBoDemRepository } from './bo-dem.repository'
-import { MongoCongViecRepository } from './cong-viec.repository'
-import { MongoDuAnRepository, MongoNhanVienRepository } from './danh-muc.repository'
-import type { KhoDuLieu } from './giao-dien'
-import { MongoLichSuRepository } from './lich-su.repository'
+import { MongoBoDemRepository } from './bo-dem.repository.ts'
+import { MongoCongViecRepository } from './cong-viec.repository.ts'
+import { MongoDuAnRepository, MongoNhanVienRepository } from './danh-muc.repository.ts'
+import type { KhoDuLieu } from './giao-dien.ts'
+import { MongoLichSuRepository } from './lich-su.repository.ts'
 
 export function taoKhoMongo(db: Db): KhoDuLieu {
   return {

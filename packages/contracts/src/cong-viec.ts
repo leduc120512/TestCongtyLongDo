@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { IdSchema, NgaySchema, PhanTrangQuerySchema } from './chung'
+import { IdSchema, NgaySchema, PhanTrangQuerySchema } from './chung.ts'
 
 // ---------- Enum ----------
 

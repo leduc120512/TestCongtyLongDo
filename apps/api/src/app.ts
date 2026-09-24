@@ -1,13 +1,13 @@
 import jwt from '@fastify/jwt'
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
-import { batBuocDangNhap } from './plugins/xac-thuc'
-import { dangKyXuLyLoi } from './plugins/xu-ly-loi'
-import type { KhoDuLieu } from './repositories/giao-dien'
-import { congViecRoutes } from './routes/cong-viec.routes'
-import { danhMucRoutes } from './routes/danh-muc.routes'
-import { xacThucRoutes } from './routes/xac-thuc.routes'
-import { CongViecService } from './services/cong-viec.service'
-import { DanhMucService } from './services/danh-muc.service'
+import { batBuocDangNhap } from './plugins/xac-thuc.ts'
+import { dangKyXuLyLoi } from './plugins/xu-ly-loi.ts'
+import type { KhoDuLieu } from './repositories/giao-dien.ts'
+import { congViecRoutes } from './routes/cong-viec.routes.ts'
+import { danhMucRoutes } from './routes/danh-muc.routes.ts'
+import { xacThucRoutes } from './routes/xac-thuc.routes.ts'
+import { CongViecService } from './services/cong-viec.service.ts'
+import { DanhMucService } from './services/danh-muc.service.ts'
 
 export type TuyChonApp = {
   kho: KhoDuLieu

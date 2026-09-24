@@ -1,5 +1,5 @@
 import { TEN_TRANG_THAI, type MaLoi, type TrangThai } from '@longdo/contracts'
-import { xacDinhVaiTro, type VaiTro } from './quyen'
+import { xacDinhVaiTro, type VaiTro } from './quyen.ts'
 
 type CongViecToiThieu = {
   nguoiGiaoId: string

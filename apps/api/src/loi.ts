@@ -14,12 +14,12 @@ const MA_HTTP: Record<MaLoi, number> = {
 
 /** Lỗi nghiệp vụ có mã; error handler đổi thành { error: { code, message } }. */
 export class LoiNghiepVu extends Error {
-  constructor(
-    public readonly code: MaLoi,
-    message: string,
-  ) {
+  readonly code: MaLoi
+
+  constructor(code: MaLoi, message: string) {
     super(message)
     this.name = 'LoiNghiepVu'
+    this.code = code
   }
 
   get httpStatus(): number {

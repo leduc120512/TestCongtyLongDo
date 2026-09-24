@@ -1,6 +1,6 @@
 import type { QuyenCongViec, TrangThai } from '@longdo/contracts'
 import { describe, expect, it } from 'vitest'
-import { tinhQuyen, xacDinhVaiTro } from '../../src/services/nghiep-vu/quyen'
+import { tinhQuyen, xacDinhVaiTro } from '../../src/services/nghiep-vu/quyen.ts'
 
 const viec = (trangThai: TrangThai) => ({
   nguoiGiaoId: 'giao',

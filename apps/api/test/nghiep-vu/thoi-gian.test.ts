@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { homNayVN, laQuaHan } from '../../src/services/nghiep-vu/thoi-gian'
+import { homNayVN, laQuaHan } from '../../src/services/nghiep-vu/thoi-gian.ts'
 
 const dangLam = (hetHan?: string) => ({ trangThai: 'DANG_LAM', hetHan })
 

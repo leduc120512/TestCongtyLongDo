@@ -1,8 +1,8 @@
 import { DanhSachCongViecQuerySchema, type NguoiDung, type TaoCongViec } from '@longdo/contracts'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { LoiNghiepVu } from '../../src/loi'
-import { CongViecService } from '../../src/services/cong-viec.service'
-import { taoId, taoKhoBoNho, type KhoBoNho } from '../ho-tro/kho-bo-nho'
+import { LoiNghiepVu } from '../../src/loi.ts'
+import { CongViecService } from '../../src/services/cong-viec.service.ts'
+import { taoId, taoKhoBoNho, type KhoBoNho } from '../ho-tro/kho-bo-nho.ts'
 
 const CT = taoId()
 const CT_KHAC = taoId()

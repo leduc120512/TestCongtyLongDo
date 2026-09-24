@@ -1,6 +1,6 @@
 import type { DuAn, NhanVien, PhanHoi } from '@longdo/contracts'
 import type { FastifyInstance } from 'fastify'
-import type { DanhMucService } from '../services/danh-muc.service'
+import type { DanhMucService } from '../services/danh-muc.service.ts'
 
 /** Danh mục trong công ty của người đang đăng nhập (congTyId lấy từ token). */
 export function danhMucRoutes(danhMuc: DanhMucService) {

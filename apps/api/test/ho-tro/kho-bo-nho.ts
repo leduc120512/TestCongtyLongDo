@@ -1,12 +1,12 @@
 import type { LocNhanh, SapXep, ThongKeNhanh } from '@longdo/contracts'
-import type { CongViecBanGhi, CongViecMoi, DuAnBanGhi, LichSuBanGhi, LichSuMoi, NhanVienBanGhi, ThayDoiCongViec } from '../../src/kieu'
+import type { CongViecBanGhi, CongViecMoi, DuAnBanGhi, LichSuBanGhi, LichSuMoi, NhanVienBanGhi, ThayDoiCongViec } from '../../src/kieu.ts'
 import type {
   BoLocCongViec,
   CongViecRepository,
   DieuKienCapNhat,
   KhoDuLieu,
-} from '../../src/repositories/giao-dien'
-import { chuanHoaTimKiem } from '../../src/repositories/tim-kiem'
+} from '../../src/repositories/giao-dien.ts'
+import { chuanHoaTimKiem } from '../../src/repositories/tim-kiem.ts'
 
 /**
  * Kho dữ liệu trong bộ nhớ, cài đặt đúng các giao diện repository. Dùng để test nghiệp vụ và quyền

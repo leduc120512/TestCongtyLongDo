@@ -1,10 +1,14 @@
 import type { DuAn, NguoiDung, NhanVien } from '@longdo/contracts'
-import { LoiNghiepVu } from '../loi'
-import type { KhoDuLieu } from '../repositories/giao-dien'
+import { LoiNghiepVu } from '../loi.ts'
+import type { KhoDuLieu } from '../repositories/giao-dien.ts'
 
 /** Danh mục nhân viên, dự án và đăng nhập giả lập. */
 export class DanhMucService {
-  constructor(private readonly kho: KhoDuLieu) {}
+  private readonly kho: KhoDuLieu
+
+  constructor(kho: KhoDuLieu) {
+    this.kho = kho
+  }
 
   nhanVien(nd: NguoiDung): Promise<NhanVien[]> {
     return this.kho.nhanVien.danhSach(nd.congTyId)

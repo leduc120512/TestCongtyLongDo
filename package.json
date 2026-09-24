@@ -5,7 +5,7 @@
   "description": "Phân hệ Công việc cho ERP Long Đỗ — bài test Full-stack Developer",
   "packageManager": "pnpm@10.34.5",
   "engines": {
-    "node": ">=20.12"
+    "node": ">=22.18"
   },
   "scripts": {
     "dev": "pnpm -r --parallel --stream run dev",

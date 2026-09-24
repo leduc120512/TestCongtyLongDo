@@ -1,6 +1,6 @@
 import { MongoServerError, type Collection, type Db } from 'mongodb'
-import { TEN_BANG } from '../db/ket-noi'
-import type { BoDemRepository } from './giao-dien'
+import { TEN_BANG } from '../db/ket-noi.ts'
+import type { BoDemRepository } from './giao-dien.ts'
 
 type BoDemDoc = { _id: string; giaTri: number }
 

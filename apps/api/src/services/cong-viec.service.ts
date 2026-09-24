@@ -15,14 +15,14 @@ import {
   type ThayDoiTruong,
   type ThongKeNhanh,
 } from '@longdo/contracts'
-import { boUndefined } from '../db/bo-undefined'
-import { TRUONG_SUA_DUOC, type CongViecBanGhi, type ThayDoiCongViec } from '../kieu'
-import { LoiNghiepVu } from '../loi'
-import type { BoLocCongViec, KhoDuLieu } from '../repositories/giao-dien'
-import { tinhQuyen, xacDinhVaiTro } from './nghiep-vu/quyen'
-import { soSanhTruong } from './nghiep-vu/so-sanh'
-import { homNayVN, laQuaHan } from './nghiep-vu/thoi-gian'
-import { xetChuyenTrangThai } from './nghiep-vu/trang-thai'
+import { boUndefined } from '../db/bo-undefined.ts'
+import { TRUONG_SUA_DUOC, type CongViecBanGhi, type ThayDoiCongViec } from '../kieu.ts'
+import { LoiNghiepVu } from '../loi.ts'
+import type { BoLocCongViec, KhoDuLieu } from '../repositories/giao-dien.ts'
+import { tinhQuyen, xacDinhVaiTro } from './nghiep-vu/quyen.ts'
+import { soSanhTruong } from './nghiep-vu/so-sanh.ts'
+import { homNayVN, laQuaHan } from './nghiep-vu/thoi-gian.ts'
+import { xetChuyenTrangThai } from './nghiep-vu/trang-thai.ts'
 
 const LOI_KHONG_THAY = 'Không tìm thấy công việc'
 const LOI_XUNG_DOT = 'Công việc vừa được người khác cập nhật, vui lòng tải lại rồi thử lại'
@@ -39,10 +39,14 @@ export function taoMaCongViec(so: number): string {
  * không bao giờ lấy từ body. Service không biết Mongo, chỉ làm việc qua KhoDuLieu.
  */
 export class CongViecService {
-  constructor(
-    private readonly kho: KhoDuLieu,
-    private readonly dongHo: () => Date = () => new Date(),
-  ) {}
+  private readonly kho: KhoDuLieu
+  /** Đồng hồ tiêm vào được, để test cố định "bây giờ" khi kiểm tra Quá hạn. */
+  private readonly dongHo: () => Date
+
+  constructor(kho: KhoDuLieu, dongHo: () => Date = () => new Date()) {
+    this.kho = kho
+    this.dongHo = dongHo
+  }
 
   // ---------- Đọc ----------
 

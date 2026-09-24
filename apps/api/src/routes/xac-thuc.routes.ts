@@ -1,7 +1,7 @@
 import { DangNhapGiaLapSchema, type KetQuaDangNhap, type NhanVien, type PhanHoi } from '@longdo/contracts'
 import type { FastifyInstance } from 'fastify'
-import { kiemTra } from '../loi'
-import type { DanhMucService } from '../services/danh-muc.service'
+import { kiemTra } from '../loi.ts'
+import type { DanhMucService } from '../services/danh-muc.service.ts'
 
 /** Route công khai: đăng nhập giả lập (chọn "Đang đăng nhập là ai"). */
 export function xacThucRoutes(danhMuc: DanhMucService) {

@@ -1,6 +1,6 @@
 import { TRANG_THAI, type TrangThai } from '@longdo/contracts'
 import { describe, expect, it } from 'vitest'
-import { xetChuyenTrangThai } from '../../src/services/nghiep-vu/trang-thai'
+import { xetChuyenTrangThai } from '../../src/services/nghiep-vu/trang-thai.ts'
 
 const GIAO = 'nguoi-giao'
 const LAM = 'nguoi-lam'

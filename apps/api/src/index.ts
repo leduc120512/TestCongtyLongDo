@@ -1,7 +1,7 @@
-import { taoApp } from './app'
-import { cauHinh } from './cau-hinh'
-import { moKetNoi, taoIndex } from './db/ket-noi'
-import { taoKhoMongo } from './repositories'
+import { taoApp } from './app.ts'
+import { cauHinh } from './cau-hinh.ts'
+import { moKetNoi, taoIndex } from './db/ket-noi.ts'
+import { taoKhoMongo } from './repositories/index.ts'
 
 const { client, db } = await moKetNoi(cauHinh.mongoUrl)
 await taoIndex(db)
@@ -20,4 +20,4 @@ const dong = async () => {
 process.on('SIGINT', dong)
 process.on('SIGTERM', dong)
 
-await app.listen({ port: cauHinh.port, host: '0.0.0.0' })
+await app.listen({ port: cauHinh.port, host: cauHinh.host })

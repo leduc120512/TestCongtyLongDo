@@ -14,8 +14,8 @@ import {
 } from '@longdo/contracts'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { kiemTra } from '../loi'
-import type { CongViecService } from '../services/cong-viec.service'
+import { kiemTra } from '../loi.ts'
+import type { CongViecService } from '../services/cong-viec.service.ts'
 
 const ThamSoIdSchema = z.object({ id: IdSchema })
 const DemQuerySchema = DanhSachCongViecQuerySchema.pick({ duAnId: true, trangThai: true, uuTien: true, q: true })

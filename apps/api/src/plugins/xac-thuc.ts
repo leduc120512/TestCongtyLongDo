@@ -1,6 +1,6 @@
 import { NguoiDungSchema, type NguoiDung } from '@longdo/contracts'
 import type { FastifyRequest } from 'fastify'
-import { LoiNghiepVu } from '../loi'
+import { LoiNghiepVu } from '../loi.ts'
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {

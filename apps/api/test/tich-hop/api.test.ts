@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify'
 import { MongoClient, ObjectId, type Db } from 'mongodb'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { taoApp } from '../../src/app'
-import { taoIndex, TEN_BANG } from '../../src/db/ket-noi'
-import { taoKhoMongo } from '../../src/repositories'
+import { taoApp } from '../../src/app.ts'
+import { taoIndex, TEN_BANG } from '../../src/db/ket-noi.ts'
+import { taoKhoMongo } from '../../src/repositories/index.ts'
 
 /**
  * Test tích hợp: HTTP thật (app.inject) + MongoDB thật, DB riêng cho test.

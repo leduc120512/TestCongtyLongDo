@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { IdSchema } from './chung'
-import { NhanVienSchema } from './nhan-vien'
+import { IdSchema } from './chung.ts'
+import { NhanVienSchema } from './nhan-vien.ts'
 
 /** Payload của JWT giả lập. userId và congTyId luôn lấy từ token, không tin client. */
 export const NguoiDungSchema = z.object({

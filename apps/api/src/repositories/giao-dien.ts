@@ -7,7 +7,7 @@ import type {
   LichSuMoi,
   NhanVienBanGhi,
   ThayDoiCongViec,
-} from '../kieu'
+} from '../kieu.ts'
 
 /**
  * Hợp đồng giữa service và repository. Service chỉ biết các giao diện này, không biết Mongo,

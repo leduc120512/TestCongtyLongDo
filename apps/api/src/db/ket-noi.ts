@@ -43,7 +43,9 @@ export async function taoIndex(db: Db): Promise<void> {
     db
       .collection(TEN_BANG.lichSu)
       .createIndex({ congTyId: 1, congViecId: 1, luc: -1 }, { name: 'lich_su_theo_viec' }),
-    db.collection(TEN_BANG.nhanVien).createIndex({ congTyId: 1, ten: 1 }, { name: 'nhan_vien_theo_cong_ty' }),
+    db
+      .collection(TEN_BANG.nhanVien)
+      .createIndex({ congTyId: 1, ten: 1 }, { name: 'nhan_vien_theo_cong_ty', collation: { locale: 'vi' } }),
     db.collection(TEN_BANG.duAn).createIndex({ congTyId: 1, ma: 1 }, { unique: true, name: 'du_an_theo_cong_ty' }),
   ])
 }
