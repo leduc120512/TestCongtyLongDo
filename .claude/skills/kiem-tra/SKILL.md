@@ -5,7 +5,7 @@ description: Chạy toàn bộ kiểm tra của repo (typecheck 3 package, test 
 
 # Kiểm tra trước khi báo xong
 
-1. Mongo phải đang chạy cho test tích hợp. Kiểm tra bằng `docker compose ps`; nếu chưa chạy thì nhắc người dùng `docker compose up -d` (test tích hợp tự bỏ qua kèm cảnh báo nếu không có Mongo — **bị bỏ qua không phải là đạt**).
+1. Mongo phải đang chạy cho test tích hợp. Kiểm tra bằng `docker compose ps`; nếu chưa chạy thì nhắc người dùng `docker compose up -d --wait` (`--wait` chờ replica set sẵn sàng) (test tích hợp tự bỏ qua kèm cảnh báo nếu không có Mongo — **bị bỏ qua không phải là đạt**).
 2. Chạy:
    ```bash
    pnpm kiem-tra

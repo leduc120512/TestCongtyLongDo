@@ -6,13 +6,23 @@
       "Bash(pnpm test)",
       "Bash(pnpm kiem-tra)",
       "Bash(pnpm -r run typecheck)",
-      "Bash(pnpm --filter:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(pnpm --filter @longdo/api test)",
+      "Bash(pnpm --filter @longdo/api run test)",
+      "Bash(pnpm --filter @longdo/api run typecheck)",
+      "Bash(pnpm --filter @longdo/web run typecheck)",
+      "Bash(pnpm --filter @longdo/web run build)",
+      "Bash(node .claude/hooks/kiem-thu-hook.mjs)"
     ],
-    "ask": ["Bash(git commit:*)", "Bash(pnpm seed)", "Bash(docker compose:*)", "Bash(pnpm add:*)"],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(pnpm seed)",
+      "Bash(docker compose:*)",
+      "Bash(pnpm add:*)"
+    ],
     "deny": [
       "Read(./.env)",
       "Read(./**/.env)",
@@ -28,12 +38,24 @@
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell|Read|Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "node .claude/hooks/chan-hanh-dong-nguy-hiem.mjs", "timeout": 10 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/chan-hanh-dong-nguy-hiem.mjs",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
       {
-        "hooks": [{ "type": "command", "command": "node .claude/hooks/kiem-tra-truoc-khi-xong.mjs", "timeout": 200 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/kiem-tra-truoc-khi-xong.mjs",
+            "timeout": 200
+          }
+        ]
       }
     ]
   }

@@ -19,7 +19,8 @@ process.stdin.on('end', () => {
 
   let doi = ''
   try {
-    doi = execSync('git status --porcelain', { encoding: 'utf8' })
+    // --untracked-files=all: liệt kê từng file trong thư mục mới, không gộp thành một dòng "?? thu-muc/".
+    doi = execSync('git status --porcelain --untracked-files=all', { encoding: 'utf8' })
   } catch {
     process.exit(0) // không phải repo git
   }

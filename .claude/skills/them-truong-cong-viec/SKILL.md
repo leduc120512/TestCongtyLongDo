@@ -13,8 +13,10 @@ Làm theo đúng thứ tự dưới đây. Mỗi bước nhỏ, chạy typecheck
 - Giá trị mặc định cho **bản ghi cũ** và cho **client cũ** không gửi trường này là gì?
 
 ## 1. `packages/contracts/src/cong-viec.ts`
-- Thêm vào `TruongNhapSchema` (body tạo/sửa) với thông báo lỗi tiếng Việt.
-- **Tương thích ngược**: trường mới trong body phải `.optional()` hoặc `.default(...)` ở API, kể cả khi nghiệp vụ coi là bắt buộc. App điện thoại bản cũ không gửi trường này. Bắt buộc thật thì đặt ở form web (schema form riêng `.required()`), không đặt ở API.
+- Thêm vào `TruongNhapGoc` (schema gốc của body tạo/sửa) với thông báo lỗi tiếng Việt, chỉ dùng `.optional()`/`.nullish()`.
+- **KHÔNG đặt `.default()` trong `TruongNhapGoc`**: `SuaCongViecSchema = TruongNhapGoc.partial()` và Zod 4 vẫn áp default bên trong `.partial()` → PATCH không gửi trường sẽ bị ghi đè bằng giá trị mặc định (lỗi này đã từng xảy ra, xem AI_LOG lần 3). Cần mặc định khi tạo thì thêm vào `TaoCongViecSchema` qua `.extend()`, giống `nguoiTheoDoiIds`/`uuTien`.
+- **Tương thích ngược**: ở API trường mới luôn không bắt buộc (có mặc định khi tạo), kể cả khi nghiệp vụ coi là bắt buộc — app điện thoại bản cũ không gửi trường này. Bắt buộc thật thì đặt ở form web (schema form riêng), không đặt ở API.
+- Chạy lại `contracts.test.ts`: `SuaCongViecSchema.parse({})` phải vẫn ra `{}`.
 - Thêm vào `CongViecSchema` (dữ liệu trả về) và `TEN_TRUONG` (nhãn cho lịch sử).
 
 ## 2. `apps/api/src/kieu.ts`
