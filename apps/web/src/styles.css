@@ -694,6 +694,12 @@ progress {
   padding: 0.6rem 0.9rem;
 }
 
+.subtasks,
+.comments,
+.history {
+  margin-left: 1rem;
+}
+
 .comment-body {
   margin: 0.3rem 0 0;
   white-space: pre-wrap;
