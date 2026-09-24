@@ -4,14 +4,11 @@ import {
   SO_VIEC_CON_TOI_DA,
   hanHopLe,
   type BinhLuan,
-  type DanhDauViecCon,
-  type ThemViecCon,
-  type ViecCon,
-  type VietBinhLuan,
   type CapNhatTienDo,
   type ChiTietCongViec,
   type ChuyenTrangThai,
   type CongViec,
+  type DanhDauViecCon,
   type DanhSachCongViecQuery,
   type DemCongViecQuery,
   type HanhDongLichSu,
@@ -21,10 +18,13 @@ import {
   type SuaCongViec,
   type TaoCongViec,
   type ThayDoiTruong,
+  type ThemViecCon,
   type ThongKeNhanh,
+  type ViecCon,
+  type VietBinhLuan,
 } from '@longdo/contracts'
 import { boUndefined } from '../db/strip-undefined.ts'
-import { TRUONG_SUA_DUOC, type CongViecBanGhi, type ThayDoiCongViec } from '../types.ts'
+import { TRUONG_SUA_DUOC, type BinhLuanBanGhi, type CongViecBanGhi, type ThayDoiCongViec } from '../types.ts'
 import { LoiNghiepVu } from '../errors.ts'
 import type { BoLocCongViec, KhoDuLieu } from '../repositories/interfaces.ts'
 import { tinhQuyen, xacDinhVaiTro } from './domain/permissions.ts'
@@ -114,24 +114,24 @@ export class CongViecService {
       const so = await tx.boDem.laySoTiepTheo(nd.congTyId)
       const moi = await tx.congViec.tao(
         boUndefined({
-        congTyId: nd.congTyId,
-        ma: taoMaCongViec(so),
-        ten: body.ten,
-        moTa: body.moTa || undefined,
-        duAnId: body.duAnId || undefined,
-        nguoiGiaoId: nd.userId,
-        nguoiThucHienIds,
-        nguoiTheoDoiIds,
-        uuTien: body.uuTien,
-        batDau: body.batDau || undefined,
-        hetHan: body.hetHan || undefined,
-        trangThai: 'CHUA_BAT_DAU' as const,
-        tienDo: 0,
-        viecCon: [],
-        phienBan: 0,
-        taoLuc: luc,
-        capNhatLuc: luc,
-      }),
+          congTyId: nd.congTyId,
+          ma: taoMaCongViec(so),
+          ten: body.ten,
+          moTa: body.moTa || undefined,
+          duAnId: body.duAnId || undefined,
+          nguoiGiaoId: nd.userId,
+          nguoiThucHienIds,
+          nguoiTheoDoiIds,
+          uuTien: body.uuTien,
+          batDau: body.batDau || undefined,
+          hetHan: body.hetHan || undefined,
+          trangThai: 'CHUA_BAT_DAU' as const,
+          tienDo: 0,
+          viecCon: [],
+          phienBan: 0,
+          taoLuc: luc,
+          capNhatLuc: luc,
+        }),
       )
       await this.ghiLichSu(tx, nd, moi.id, 'TAO', [], luc)
       return moi
@@ -263,7 +263,11 @@ export class CongViecService {
       throw new LoiNghiepVu('VALIDATION', `Tối đa ${SO_VIEC_CON_TOI_DA} việc con cho một công việc`)
     }
     const moi: ViecCon = { id: randomBytes(12).toString('hex'), ten: body.ten, xong: false }
-    return this.ghiViecCon(nd, cv, [...cv.viecCon, moi], { truong: 'viecCon', tu: null, den: { ten: moi.ten, xong: false } })
+    return this.ghiViecCon(nd, cv, [...cv.viecCon, moi], {
+      truong: 'viecCon',
+      tu: null,
+      den: { ten: moi.ten, xong: false },
+    })
   }
 
   /** Người thực hiện đánh dấu xong/chưa xong khi việc đang làm. */
@@ -353,7 +357,9 @@ export class CongViecService {
       khacBiet.push({ truong: 'tienDo', tu: cv.tienDo, den: tienDo })
     }
     const luc = this.dongHo()
-    const moi = await this.ghiCoKhoa(cv, thayDoi, luc, (tx) => this.ghiLichSu(tx, nd, cv.id, 'VIEC_CON', khacBiet, luc))
+    const moi = await this.ghiCoKhoa(cv, thayDoi, luc, (tx) =>
+      this.ghiLichSu(tx, nd, cv.id, 'VIEC_CON', khacBiet, luc),
+    )
     return sangChiTiet(moi, nd.userId, luc)
   }
 
@@ -468,7 +474,7 @@ function sangChiTiet(cv: CongViecBanGhi, userId: string, luc: Date): ChiTietCong
   return { ...sangCongViec(cv, luc), quyen: tinhQuyen(cv, userId) }
 }
 
-function sangBinhLuan(bl: { id: string; congViecId: string; nguoiVietId: string; noiDung: string; taoLuc: Date }): BinhLuan {
+function sangBinhLuan(bl: BinhLuanBanGhi): BinhLuan {
   return {
     id: bl.id,
     congViecId: bl.congViecId,

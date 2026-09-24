@@ -39,7 +39,14 @@ export class MongoBinhLuanRepository implements BinhLuanRepository {
     const congViecId = sangObjectId(banGhi.congViecId)
     const nguoiVietId = sangObjectId(banGhi.nguoiVietId)
     if (!congTyId || !congViecId || !nguoiVietId) throw new Error('Id bình luận không hợp lệ')
-    const doc: BinhLuanDoc = { _id: new ObjectId(), congTyId, congViecId, nguoiVietId, noiDung: banGhi.noiDung, taoLuc: banGhi.taoLuc }
+    const doc: BinhLuanDoc = {
+      _id: new ObjectId(),
+      congTyId,
+      congViecId,
+      nguoiVietId,
+      noiDung: banGhi.noiDung,
+      taoLuc: banGhi.taoLuc,
+    }
     await this.col.insertOne(doc, { session: this.session })
     return sangBanGhi(doc)
   }

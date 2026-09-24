@@ -64,7 +64,8 @@ export class MongoLichSuRepository implements LichSuRepository {
     const ct = sangObjectId(congTyId)
     const cv = sangObjectId(congViecId)
     if (!ct || !cv) return []
-    const docs = await this.col.find({ congTyId: ct, congViecId: cv }, { session: this.session })
+    const docs = await this.col
+      .find({ congTyId: ct, congViecId: cv }, { session: this.session })
       .sort({ luc: -1, _id: -1 })
       .toArray()
     return docs.map(sangBanGhi)

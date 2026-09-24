@@ -2,15 +2,15 @@ import {
   CapNhatTienDoSchema,
   ChuyenTrangThaiSchema,
   DanhDauViecConSchema,
+  DanhSachCongViecQuerySchema,
+  DemCongViecQuerySchema,
+  SuaCongViecSchema,
+  TaoCongViecSchema,
+  ThamSoIdSchema,
+  ThamSoViecConSchema,
   ThemViecConSchema,
   VietBinhLuanSchema,
   type BinhLuan,
-  DanhSachCongViecQuerySchema,
-  DemCongViecQuerySchema,
-  ThamSoIdSchema,
-  ThamSoViecConSchema,
-  SuaCongViecSchema,
-  TaoCongViecSchema,
   type ChiTietCongViec,
   type CongViec,
   type LichSu,
@@ -21,7 +21,6 @@ import {
 import type { FastifyInstance } from 'fastify'
 import { kiemTra } from '../errors.ts'
 import type { CongViecService } from '../services/task.service.ts'
-
 
 /**
  * Route chỉ làm 3 việc: validate đầu vào bằng schema trong contracts, gọi service với req.user

@@ -34,11 +34,13 @@ export class MongoNhanVienRepository implements NhanVienRepository {
   async danhSach(congTyId: string): Promise<NhanVienBanGhi[]> {
     const ct = sangObjectId(congTyId)
     if (!ct) return []
-    return (await this.col.find({ congTyId: ct }).collation(TIENG_VIET).sort({ ten: 1 }).toArray()).map(nhanVienSang)
+    const docs = await this.col.find({ congTyId: ct }).collation(TIENG_VIET).sort({ ten: 1 }).toArray()
+    return docs.map(nhanVienSang)
   }
 
   async danhSachGiaLap(): Promise<NhanVienBanGhi[]> {
-    return (await this.col.find({}).collation(TIENG_VIET).sort({ congTyId: 1, ten: 1 }).limit(200).toArray()).map(nhanVienSang)
+    const docs = await this.col.find({}).collation(TIENG_VIET).sort({ congTyId: 1, ten: 1 }).limit(200).toArray()
+    return docs.map(nhanVienSang)
   }
 
   async timTheoId(id: string): Promise<NhanVienBanGhi | null> {
