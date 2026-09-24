@@ -84,7 +84,12 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
     await db.collection(TEN_BANG.duAn).insertOne({ _id: DU_AN, congTyId: CT, ma: 'CNC', ten: 'Cầu Nam Căn' })
     const hello = await db.admin().command({ hello: 1 })
     coGiaoDich = Boolean(hello.setName)
-    app = await taoApp({ kho: taoKhoMongo(client!, db, coGiaoDich), jwtSecret: 'bi-mat-test', dongHo: () => bayGio })
+    app = await taoApp({
+      kho: taoKhoMongo(client!, db, coGiaoDich),
+      jwtSecret: 'bi-mat-test',
+      dangNhapGiaLap: true,
+      dongHo: () => bayGio,
+    })
     for (const nv of [GIAO, LAM, XEM, NGOAI, NV_CT_KHAC]) {
       const res = await goi('POST', '/api/xac-thuc/dang-nhap-gia-lap', undefined, { userId: nv.toHexString() })
       token[nv.toHexString()] = res.json().data.token
@@ -120,6 +125,23 @@ describe.skipIf(!client)('API tích hợp với MongoDB', () => {
     it('token chứa congTyId lấy từ hồ sơ nhân viên', async () => {
       const payload = app.jwt.decode<{ userId: string; congTyId: string }>(token[GIAO.toHexString()]!)
       expect(payload).toMatchObject({ userId: GIAO.toHexString(), congTyId: CT.toHexString() })
+    })
+
+    it('tắt đăng nhập giả lập (production): không tự cấp token, không lộ danh sách nhân viên', async () => {
+      const appThat = await taoApp({ kho: taoKhoMongo(client!, db, coGiaoDich), jwtSecret: 'bi-mat-test', dangNhapGiaLap: false })
+      try {
+        const dangNhap = await appThat.inject({
+          method: 'POST',
+          url: '/api/xac-thuc/dang-nhap-gia-lap',
+          payload: { userId: GIAO.toHexString() },
+        })
+        expect(dangNhap.statusCode).toBe(404)
+        expect(dangNhap.json()).toEqual({ error: { code: 'KHONG_TIM_THAY', message: expect.any(String) } })
+        const ds = await appThat.inject({ method: 'GET', url: '/api/xac-thuc/nguoi-dung-gia-lap' })
+        expect(ds.statusCode).toBe(404)
+      } finally {
+        await appThat.close()
+      }
     })
 
     it('đường dẫn không tồn tại → 404 đúng dạng lỗi', async () => {

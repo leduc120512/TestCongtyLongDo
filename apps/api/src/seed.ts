@@ -154,6 +154,8 @@ const DUONG_DI: Record<TrangThai, TrangThai[]> = {
 }
 
 async function main() {
+  // Seed xóa sạch mọi collection rồi tạo lại: không bao giờ chạy trên dữ liệu thật.
+  if (cauHinh.laProduction) throw new Error('Không chạy seed khi NODE_ENV=production: seed xóa toàn bộ dữ liệu')
   const { client, db, coGiaoDich } = await moKetNoi(cauHinh.mongoUrl)
   try {
     await Promise.all(

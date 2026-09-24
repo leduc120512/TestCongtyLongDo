@@ -18,7 +18,7 @@ export class DanhMucService {
     return this.kho.duAn.danhSach(nd.congTyId)
   }
 
-  /** Danh sách để chọn "Đang đăng nhập là ai" — chỉ phục vụ bản demo, không có ở production. */
+  /** Danh sách để chọn "Đang đăng nhập là ai" — chỉ phục vụ bản demo; production tắt route (xem app.ts). */
   nguoiDungGiaLap(): Promise<NhanVien[]> {
     return this.kho.nhanVien.danhSachGiaLap()
   }

@@ -21,4 +21,6 @@ export const cauHinh = {
   mongoUrl: process.env.MONGO_URL ?? 'mongodb://localhost:27017/longdo_congviec?directConnection=true',
   jwtSecret,
   dungSecretMacDinh: jwtSecret === SECRET_DEV,
+  /** Production: tắt đăng nhập giả lập (cấp token cho bất kỳ nhân viên nào) và không cho chạy seed. */
+  laProduction,
 }

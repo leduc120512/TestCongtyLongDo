@@ -19,7 +19,7 @@ pnpm dev
 
 Mở http://localhost:5173 rồi chọn **"Đang đăng nhập là"** ở góc trên. Mỗi tab trình duyệt có thể đóng vai một người khác (phiên lưu trong `sessionStorage`), tiện thử người giao và người thực hiện cùng lúc.
 
-Kiểm tra (typecheck 3 package + 154 test; test tích hợp cần Mongo đang chạy):
+Kiểm tra (typecheck 3 package + 155 test; test tích hợp cần Mongo đang chạy):
 
 ```bash
 pnpm kiem-tra
@@ -49,8 +49,8 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 | Method | Đường dẫn | Ai được dùng |
 |---|---|---|
 | GET | `/api/suc-khoe` | công khai (kiểm tra API còn sống) |
-| GET | `/api/xac-thuc/nguoi-dung-gia-lap` | công khai (ô chọn người) |
-| POST | `/api/xac-thuc/dang-nhap-gia-lap` `{ userId }` | công khai → JWT 12 giờ |
+| GET | `/api/xac-thuc/nguoi-dung-gia-lap` | công khai (ô chọn người); tắt khi production |
+| POST | `/api/xac-thuc/dang-nhap-gia-lap` `{ userId }` | công khai → JWT 12 giờ; tắt khi production |
 | GET | `/api/nhan-vien`, `/api/du-an` | người trong công ty |
 | GET | `/api/cong-viec?nhanh&duAnId&trangThai&uuTien&q&sapXep&page&limit` | việc mình liên quan |
 | GET | `/api/cong-viec/dem?duAnId&trangThai&uuTien&q` | số việc ở 4 lọc nhanh |
@@ -93,6 +93,7 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 12. Việc con: người giao chỉ thêm/xóa khi chưa bắt đầu hoặc đang làm; lúc chờ duyệt phải trả lại trước. Có việc con thì tiến độ không nhập tay.
 13. Hai người cùng thao tác trên một công việc thì người sau nhận `409 XUNG_DOT` và phải tải lại, không có chuyện ghi đè im lặng.
 14. Mongo chạy replica set một node để dùng transaction. Nếu trỏ tới mongod đơn lẻ, API vẫn chạy nhưng không có transaction và ghi cảnh báo lúc khởi động.
+15. Đăng nhập giả lập chỉ để demo: khi `NODE_ENV=production`, hai route `xac-thuc/*` trả 404 (chạy thật cần đăng nhập thật). Seed cũng từ chối chạy khi production, vì seed xóa sạch dữ liệu.
 
 ## Câu hỏi thiết kế
 
@@ -130,7 +131,7 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 - **Nhẹ:** API không cần `tsx` hay bước build, vì Node ≥ 22.18 tự bỏ kiểu TS. tsconfig bật `erasableSyntaxOnly` để bảo đảm điều đó. Web tách chunk theo trang (`React.lazy`), không dùng thư viện UI, chỉ CSS thuần.
 - **Index:** 3 index danh sách theo vai trò, sắp theo ESR (bằng → sắp xếp → khoảng). "Tất cả" là `$or` của 3 nhánh, bộ lọc phụ đưa vào từng nhánh, nên Mongo dùng `SORT_MERGE` trên index thay vì sắp xếp trong bộ nhớ.
 - **Không ghi `undefined`:** `boUndefined` khi tạo; trong thay đổi, `null` nghĩa là `$unset`. Driver cũng bật `ignoreUndefined` làm lưới an toàn. Có test đọc thẳng document Mongo để kiểm tra.
-- **Kiểm thử:** 154 test. `unit/` gồm luật thuần, contracts, service với kho trong bộ nhớ, và việc con/bình luận. `integration/` là HTTP thật trên Mongo thật: quyền, dạng response, index (`explain`), transaction, đồng thời.
+- **Kiểm thử:** 155 test. `unit/` gồm luật thuần, contracts, service với kho trong bộ nhớ, và việc con/bình luận. `integration/` là HTTP thật trên Mongo thật: quyền, dạng response, index (`explain`), transaction, đồng thời.
 
 ## Claude Code trong repo (`.claude/`)
 

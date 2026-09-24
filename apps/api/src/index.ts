@@ -9,6 +9,7 @@ await taoIndex(db)
 const app = await taoApp({
   kho: taoKhoMongo(client, db, coGiaoDich),
   jwtSecret: cauHinh.jwtSecret,
+  dangNhapGiaLap: !cauHinh.laProduction,
   logger: { level: 'info' },
 })
 

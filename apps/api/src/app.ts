@@ -12,6 +12,11 @@ import { DanhMucService } from './services/catalog.service.ts'
 export type TuyChonApp = {
   kho: KhoDuLieu
   jwtSecret: string
+  /**
+   * Bật route đăng nhập giả lập (ô chọn "Đang đăng nhập là ai"). Route này cấp token cho bất kỳ
+   * nhân viên nào và liệt kê nhân viên mọi công ty, nên chỉ dùng cho dev/demo, không bật ở production.
+   */
+  dangNhapGiaLap: boolean
   logger?: FastifyServerOptions['logger']
   /** Cho phép test cố định "bây giờ" để kiểm tra Quá hạn. */
   dongHo?: () => Date
@@ -43,8 +48,8 @@ export async function taoApp(tuyChon: TuyChonApp): Promise<FastifyInstance> {
 
   app.get('/api/suc-khoe', async () => ({ data: { ok: true } }))
 
-  // Công khai: chỉ phục vụ màn chọn "Đang đăng nhập là ai".
-  await app.register(xacThucRoutes(danhMuc), { prefix: '/api' })
+  // Công khai: chỉ phục vụ màn chọn "Đang đăng nhập là ai". Tắt thì các route này trả 404.
+  if (tuyChon.dangNhapGiaLap) await app.register(xacThucRoutes(danhMuc), { prefix: '/api' })
 
   // Mọi route còn lại bắt buộc có token.
   await app.register(
