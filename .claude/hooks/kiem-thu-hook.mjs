@@ -19,6 +19,9 @@ const CA = [
   [bash('rm -rf apps'), 2],
   [bash('docker compose down -v'), 2],
   [bash('mongosh --eval "db.dropDatabase()"'), 2],
+  [bash('docker exec longdo-mongo mongosh longdo_congviec --eval "db.cong_viec.deleteMany({})"'), 2],
+  // Sửa code có chứa chuỗi deleteMany({}) không phải là xóa dữ liệu (từng bị chặn nhầm).
+  [bash(`node -e "s = s.replace(a, 'await db.collection(x).deleteMany({})')"`), 0],
   [bash('cat apps/api/.env'), 2],
   [bash('grep JWT_SECRET apps/api/.env'), 2],
   [bash('echo JWT_SECRET=x >> apps/api/.env'), 2],

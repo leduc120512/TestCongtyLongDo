@@ -13,7 +13,11 @@ const LENH_CAM = [
   [/\bgit\s+rebase\b/, 'rebase viết lại lịch sử commit (đề yêu cầu giữ nguyên lịch sử)'],
   [/\brm\s+-[a-z]*r[a-z]*f|\brm\s+-[a-z]*f[a-z]*r/, 'rm -rf xóa không khôi phục được'],
   [/Remove-Item\b.*-Recurse/i, 'xóa đệ quy không khôi phục được'],
-  [/\bdropDatabase\b|\.drop\(\)|\bdeleteMany\(\s*\{\s*\}\s*\)/, 'xóa dữ liệu Mongo (dùng pnpm seed nếu cần làm lại dữ liệu demo)'],
+  // Chỉ chặn khi lệnh thực sự gửi tới Mongo (mongosh / docker exec), không chặn việc sửa code có chứa chuỗi này.
+  [
+    /\b(mongosh|mongo|docker\s+exec)\b[\s\S]*(\bdropDatabase\b|\.drop\(\)|\bdeleteMany\(\s*\{\s*\}\s*\)|\bremove\(\s*\{\s*\}\s*\))/,
+    'xóa dữ liệu Mongo (dùng pnpm seed nếu cần làm lại dữ liệu demo)',
+  ],
   [/docker\s+compose\s+down\b.*(-v\b|--volumes\b)/, 'xóa volume dữ liệu Mongo'],
 ]
 
