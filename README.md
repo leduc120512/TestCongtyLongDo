@@ -43,11 +43,12 @@ apps/web/src/    pages → hooks (TanStack Query) → api (fetch); components d�
 
 ## API
 
-Mọi route (trừ `xac-thuc/*`) cần `Authorization: Bearer <token>`. `userId`, `congTyId` chỉ lấy từ token.
+Mọi route (trừ `xac-thuc/*` và `suc-khoe`) cần `Authorization: Bearer <token>`. `userId`, `congTyId` chỉ lấy từ token.
 Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi `{ error: { code, message } }`.
 
 | Method | Đường dẫn | Ai được dùng |
 |---|---|---|
+| GET | `/api/suc-khoe` | công khai (kiểm tra API còn sống) |
 | GET | `/api/xac-thuc/nguoi-dung-gia-lap` | công khai (ô chọn người) |
 | POST | `/api/xac-thuc/dang-nhap-gia-lap` `{ userId }` | công khai → JWT 12 giờ |
 | GET | `/api/nhan-vien`, `/api/du-an` | người trong công ty |
@@ -136,9 +137,9 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 | Thành phần | Công dụng |
 |---|---|
 | `CLAUDE.md` | Luật cho phiên Claude mới: phân tầng, dạng response, xóa mềm, múi giờ, quyền theo công ty, lệnh kiểm tra, việc cấm. |
-| `settings.json` | Cho phép sẵn lệnh đọc/kiểm tra; hỏi trước khi commit/seed/cài gói; cấm đọc `.env`, `git push`, `reset --hard`. |
-| `hooks/chan-hanh-dong-nguy-hiem.mjs` | PreToolUse: chặn lệnh không hoàn tác được và đọc/ghi `.env`. Chạy `node .claude/hooks/kiem-thu-hook.mjs` để thử 33 ca. |
-| `hooks/kiem-tra-truoc-khi-xong.mjs` | Stop: còn file `.ts` thay đổi mà typecheck lỗi thì không cho Claude kết thúc lượt. Có chống vòng lặp. |
+| `settings.json` | Chỉ cho phép sẵn đúng các lệnh đọc/kiểm tra; commit, seed, cài gói phải hỏi; cấm đọc `.env`, `git push`, `reset --hard`. |
+| `hooks/chan-hanh-dong-nguy-hiem.mjs` | PreToolUse: chặn lệnh không hoàn tác được và đọc/ghi `.env`. Chạy `node .claude/hooks/kiem-thu-hook.mjs` để thử 47 ca. |
+| `hooks/kiem-tra-truoc-khi-xong.mjs` | Stop: còn file `.ts` thay đổi (kể cả file mới chưa theo dõi) mà typecheck lỗi thì không cho Claude kết thúc lượt. Có chống vòng lặp. |
 | `skills/kiem-tra` | `/kiem-tra`: chạy kiểm tra và rà checklist luật trước khi báo xong. |
 | `skills/them-truong-cong-viec` | `/them-truong-cong-viec`: quy trình thêm trường xuyên các tầng, có bước tương thích ngược. |
 | `agents/soat-luat-du-an.md` | Subagent chỉ đọc, soát diff theo luật repo, dùng làm góc nhìn độc lập trước khi commit. |

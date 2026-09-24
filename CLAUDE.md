@@ -3,7 +3,7 @@
 pnpm workspace: `packages/contracts` (Zod dùng chung) · `apps/api` (Fastify 5 + MongoDB, Node chạy TS trực tiếp) · `apps/web` (React 19 + Vite + TanStack Query). Tên biến/hàm tiếng Việt không dấu, giữ nguyên phong cách đó.
 
 ## Lệnh
-- Chạy: `docker compose up -d` → `pnpm seed` → `pnpm dev` (API :3000, web :5173)
+- Chạy: `docker compose up -d --wait` (chờ replica set Mongo sẵn sàng) → `pnpm seed` → `pnpm dev` (API :3000, web :5173)
 - **Trước khi báo xong phải chạy `pnpm kiem-tra`** (typecheck 3 package + test) và đọc kết quả thật. Test tích hợp cần Mongo; "bỏ qua" không phải "đạt". Xem skill `/kiem-tra`.
 - Thêm/đổi trường công việc: làm theo skill `/them-truong-cong-viec`.
 

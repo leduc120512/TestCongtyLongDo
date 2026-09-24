@@ -123,10 +123,11 @@ Công cụ: Claude Code (desktop). Dưới đây là 6 lần làm việc đáng 
 - Lần 1: hook chặn chính lệnh commit, vì commit message có chữ ".env". AI siết lại: chỉ chặn khi có lệnh đọc/ghi (`cat`, `grep`, `vi`, `>`...) trỏ vào file `.env`.
 - Lần 2: vẫn chặn. Nguyên nhân: `\b` của JavaScript chỉ hiểu chữ ASCII, nên trong "việc", đoạn "vi" bị coi là lệnh `vi`. Sửa bằng lookaround Unicode `(?<![\p{L}\p{N}_-])…` với cờ `u`.
 - Lần 3: hook chặn lệnh sửa file test chỉ vì trong code có chuỗi `deleteMany({})`. Sửa: chỉ chặn xóa dữ liệu khi lệnh thực sự gửi tới Mongo (`mongosh`, `docker exec`).
+- Lần 4, sai theo chiều ngược lại (chặn thiếu): workflow soát cuối chạy thử hook và thấy các biến thể `rm -Rf`, `rm -r -f`, PowerShell `Remove-Item -r -fo`, commit với `-n` (viết tắt của `--no-verify`) đều lọt. 33 ca thử cũ vẫn đạt vì không có ca nào thuộc các dạng này. Sửa regex, thêm 14 ca.
 
 **Nhận, sửa hay bỏ.** Nhận cách tiếp cận, nhưng phải sửa 3 lần. Mỗi lần chặn nhầm đều thành một ca thử mới trong `.claude/hooks/kiem-thu-hook.mjs`, để lỗi cũ không quay lại.
 
 **Kiểm lại.**
-- `node .claude/hooks/kiem-thu-hook.mjs`: 33 ca chặn/cho phép đều đạt.
+- `node .claude/hooks/kiem-thu-hook.mjs`: 47 ca chặn/cho phép đều đạt.
 - Hook có hiệu lực ngay trong phiên làm bài: nó đã chặn thật lệnh thử có chứa `git reset --hard`. Đây là bằng chứng hook chắc chắn hơn lời dặn.
 - Bài học: ca thử chứa mẫu cấm phải để trong file, vì đưa thẳng lên dòng lệnh thì chính hook sẽ chặn.
