@@ -37,11 +37,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|PowerShell|Read|Edit|Write|MultiEdit",
+        "matcher": "Bash|PowerShell|Read|Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-dangerous-actions.mjs",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-dangerous-actions.mjs\"",
             "timeout": 10
           }
         ]
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/typecheck-before-stop.mjs",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/typecheck-before-stop.mjs\"",
             "timeout": 200
           }
         ]

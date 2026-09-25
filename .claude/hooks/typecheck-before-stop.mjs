@@ -4,6 +4,9 @@
 // Chỉ chạy typecheck (vài giây); test đầy đủ vẫn là việc của `pnpm verify` theo CLAUDE.md.
 import { execSync } from 'node:child_process'
 
+// Luôn chạy ở gốc repo, kể cả khi phiên Claude đang đứng ở thư mục con (apps/api...).
+const cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd()
+
 let raw = ''
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (d) => (raw += d))
@@ -20,14 +23,14 @@ process.stdin.on('end', () => {
   let changed = ''
   try {
     // --untracked-files=all: liệt kê từng file trong thư mục mới, không gộp thành một dòng "?? thu-muc/".
-    changed = execSync('git status --porcelain --untracked-files=all', { encoding: 'utf8' })
+    changed = execSync('git status --porcelain --untracked-files=all', { cwd, encoding: 'utf8' })
   } catch {
     process.exit(0) // không phải repo git
   }
   if (!/\.(ts|tsx)\s*$/m.test(changed)) process.exit(0)
 
   try {
-    execSync('pnpm -r run typecheck', { stdio: 'pipe', encoding: 'utf8', timeout: 180_000 })
+    execSync('pnpm -r run typecheck', { cwd, stdio: 'pipe', encoding: 'utf8', timeout: 180_000 })
     process.exit(0)
   } catch (e) {
     const out = `${e.stdout ?? ''}${e.stderr ?? ''}`.split('\n').filter((l) => /error TS|Failed/.test(l))
