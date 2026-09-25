@@ -15,7 +15,7 @@ Làm theo đúng thứ tự dưới đây. Mỗi bước nhỏ, chạy typecheck
 ## 1. `packages/contracts/src/task.ts`
 - Thêm vào `BaseTaskFields` (schema gốc của body tạo/sửa) với thông báo lỗi tiếng Việt, chỉ dùng `.optional()`/`.nullish()`.
 - **KHÔNG đặt `.default()` trong `BaseTaskFields`**: `UpdateTaskSchema = BaseTaskFields.partial()` và Zod 4 vẫn áp default bên trong `.partial()` → PATCH không gửi trường sẽ bị ghi đè bằng giá trị mặc định (lỗi này đã từng xảy ra, xem AI_LOG lần 3). Cần mặc định khi tạo thì thêm vào `CreateTaskSchema` qua `.extend()`, giống `nguoiTheoDoiIds`/`uuTien`.
-- **Tương thích ngược**: ở API trường mới luôn không bắt buộc (có mặc định khi tạo), kể cả khi nghiệp vụ coi là bắt buộc — app điện thoại bản cũ không gửi trường này. Bắt buộc thật thì đặt ở form web (schema form riêng), không đặt ở API.
+- **Tương thích ngược**: ở API trường mới luôn không bắt buộc (có mặc định khi tạo), kể cả khi nghiệp vụ coi là bắt buộc — app điện thoại bản cũ không gửi trường này. Bắt buộc thật thì đặt ở form web bằng schema form riêng, **vẫn viết trong `packages/contracts`**: `CreateTaskFormSchema = CreateTaskSchema.extend({ loaiCongViec: LoaiCongViecSchema })`, `TaskForm` dùng qua `zodResolver`. API vẫn validate bằng `CreateTaskSchema` (trường tùy chọn, có mặc định).
 - Chạy lại `contracts.test.ts`: `UpdateTaskSchema.parse({})` phải vẫn ra `{}`.
 - Thêm vào `TaskSchema` (dữ liệu trả về) và `FIELD_LABELS` (nhãn cho lịch sử).
 

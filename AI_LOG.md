@@ -2,7 +2,7 @@
 
 Công cụ: Claude Code (desktop). Dưới đây là 6 lần làm việc đáng kể nhất, theo thứ tự thời gian. Lần 3, 4 và 6 là những lần **AI làm sai** và bị phát hiện.
 
-> Sau các lần dưới đây, tên thư mục, tên file và tên trong code đã đổi sang tiếng Anh; hợp đồng dữ liệu (tên trường, enum, URL API) giữ nguyên. Đường dẫn trong nhật ký đã cập nhật theo tên mới. Tên hàm, kiểu giữ như lúc làm; tên hiện tại: `xetChuyenTrangThai` → `checkStatusTransition`, `tinhQuyen` → `getPermissions`, `homNayVN` → `todayInVietnam`, `TaoCongViecSchema`/`SuaCongViecSchema` → `CreateTaskSchema`/`UpdateTaskSchema`, `TruongNhapGoc` → `BaseTaskFields`, `kho.giaoDich` → `store.transaction`, `ghiCoKhoa` → `writeWithLock`.
+> Sau các lần dưới đây, tên thư mục, tên file và tên trong code đã đổi sang tiếng Anh; hợp đồng dữ liệu (tên trường, enum, URL API) giữ nguyên. Đường dẫn trong nhật ký đã cập nhật theo tên mới. Tên hàm, kiểu giữ như lúc làm; tên hiện tại: `xetChuyenTrangThai` → `checkStatusTransition`, `tinhQuyen` → `getPermissions`, `homNayVN` → `todayInVietnam`, `TaoCongViecSchema`/`SuaCongViecSchema` → `CreateTaskSchema`/`UpdateTaskSchema`, `TruongNhapSchema`/`TruongNhapGoc` → `BaseTaskFields`, `kho.giaoDich` → `store.transaction`, `ghiCoKhoa` → `writeWithLock`.
 
 ---
 
@@ -126,10 +126,12 @@ Công cụ: Claude Code (desktop). Dưới đây là 6 lần làm việc đáng 
 - Lần 2: vẫn chặn. Nguyên nhân: `\b` của JavaScript chỉ hiểu chữ ASCII, nên trong "việc", đoạn "vi" bị coi là lệnh `vi`. Sửa bằng lookaround Unicode `(?<![\p{L}\p{N}_-])…` với cờ `u`.
 - Lần 3: hook chặn lệnh sửa file test chỉ vì trong code có chuỗi `deleteMany({})`. Sửa: chỉ chặn xóa dữ liệu khi lệnh thực sự gửi tới Mongo (`mongosh`, `docker exec`).
 - Lần 4, sai theo chiều ngược lại (chặn thiếu): workflow soát cuối chạy thử hook và thấy các biến thể `rm -Rf`, `rm -r -f`, PowerShell `Remove-Item -r -fo`, commit với `-n` (viết tắt của `--no-verify`) đều lọt. 33 ca thử cũ vẫn đạt vì không có ca nào thuộc các dạng này. Sửa regex, thêm 14 ca.
+- Lần 5, workflow soát lại trước khi nộp chạy thử hook từ thư mục con: hook gọi bằng đường dẫn tương đối, nên khi phiên Claude `cd apps/api` thì `node` báo "Cannot find module" và thoát mã 1. Mã 1 là lỗi **không chặn**, lệnh vẫn chạy. Thêm nữa, `git -C . push`, `git clean -d -f`, `base64 .env` lọt; commit message có chữ "git push" hay "-n" bị chặn nhầm. Sửa: gọi hook bằng `$CLAUDE_PROJECT_DIR`, cho phép tùy chọn toàn cục của git trước lệnh con, bỏ nội dung `-m "..."` và mẫu grep đọc từ pipe trước khi so, thêm 25 ca. Hook vẫn chặn cả văn bản trong heredoc có chứa lệnh cấm; chấp nhận, vì không phân biệt được heredoc là chữ hay là script sắp chạy.
 
 **Nhận, sửa hay bỏ.** Nhận cách tiếp cận, nhưng phải sửa 3 lần. Mỗi lần chặn nhầm đều thành một ca thử mới trong `.claude/hooks/test-hooks.mjs`, để lỗi cũ không quay lại.
 
 **Kiểm lại.**
-- `node .claude/hooks/test-hooks.mjs`: 47 ca chặn/cho phép đều đạt.
+- `node .claude/hooks/test-hooks.mjs`: 72 ca chặn/cho phép đều đạt.
+- Thử thật sau khi đổi sang `$CLAUDE_PROJECT_DIR`: đọc `.env.local` (file không tồn tại, nên có lọt cũng vô hại) từ gốc repo và từ `apps/api` đều bị chặn.
 - Hook có hiệu lực ngay trong phiên làm bài: nó đã chặn thật lệnh thử có chứa `git reset --hard`. Đây là bằng chứng hook chắc chắn hơn lời dặn.
 - Bài học: ca thử chứa mẫu cấm phải để trong file, vì đưa thẳng lên dòng lệnh thì chính hook sẽ chặn.

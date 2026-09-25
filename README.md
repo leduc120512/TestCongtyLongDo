@@ -95,7 +95,7 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 
 1. Người tạo là người giao, không đổi được. Ai trong công ty cũng tạo được việc.
 2. Người giao sửa được mọi thông tin khi việc chưa hoàn thành, kể cả lúc chờ duyệt. Tiến độ và trạng thái không sửa qua form, chỉ qua thao tác riêng.
-3. Tiến độ chỉ người thực hiện cập nhật và chỉ khi đang làm. Chưa bắt đầu thì là 0. Trả lại thì giữ tiến độ cũ, hoặc tính lại nếu có việc con.
+3. Tiến độ chỉ người thực hiện cập nhật và chỉ khi đang làm. Chưa bắt đầu thì là 0. Gửi duyệt thì thành 100%; bị trả lại thì vẫn giữ 100% (người thực hiện tự hạ lại), hoặc tính lại theo việc con nếu có.
 4. Người không liên quan và người khác công ty đều nhận **404**, không phải 403, để không lộ công việc có tồn tại hay không.
 5. Ai đã là người thực hiện thì tự bị loại khỏi danh sách theo dõi.
 6. "Tất cả" là việc tôi giao, tôi thực hiện hoặc tôi theo dõi. Số đếm ở 4 lọc nhanh áp cùng bộ lọc phụ đang chọn.
@@ -105,9 +105,11 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 10. `batDau`/`hetHan` là ngày lịch giờ VN, lưu chuỗi `YYYY-MM-DD`, không lưu `Date`.
 11. Tìm kiếm không phân biệt hoa thường và dấu tiếng Việt: "nghiem thu" tìm được "Nghiệm thu". Tìm theo tên hoặc mã.
 12. Việc con: người giao chỉ thêm/xóa khi chưa bắt đầu hoặc đang làm; lúc chờ duyệt phải trả lại trước. Có việc con thì tiến độ không nhập tay.
-13. Hai người cùng thao tác trên một công việc thì người sau nhận `409 XUNG_DOT` và phải tải lại, không có chuyện ghi đè im lặng.
+13. Hai lệnh ghi chạy chen nhau trên cùng một công việc thì lệnh sau nhận `409 XUNG_DOT` (khóa `trangThai` + `phienBan`), nên giá trị "từ" trong lịch sử luôn đúng; web gặp 409/404 thì tự tải lại chi tiết. Client **không** gửi `phienBan` (lý do ở AI_LOG lần 4: chỉ người giao sửa được, gửi kèm thì người giao gặp xung đột giả mỗi khi người thực hiện cập nhật tiến độ). Vì vậy ai đang xem dữ liệu cũ mà lưu thì người lưu sau thắng, nhưng lịch sử vẫn ghi đủ. Nếu cần chặn hẳn: nhận `phienBan` tùy chọn hoặc header `If-Match` riêng cho form sửa, app cũ không gửi thì vẫn chạy.
 14. Mongo chạy replica set một node để dùng transaction. Nếu trỏ tới mongod đơn lẻ, API vẫn chạy nhưng không có transaction và ghi cảnh báo lúc khởi động.
-15. Đăng nhập giả lập chỉ để demo: khi `NODE_ENV=production`, hai route `xac-thuc/*` trả 404 (chạy thật cần đăng nhập thật). Bản demo deploy bật lại bằng `ALLOW_MOCK_LOGIN=true`, và API ghi cảnh báo lúc khởi động. Seed cũng từ chối chạy khi production, vì seed xóa sạch dữ liệu.
+15. Đăng nhập giả lập chỉ để demo: khi `NODE_ENV=production`, hai route `xac-thuc/*` trả 404 (chạy thật cần đăng nhập thật). Bản demo deploy bật lại bằng `ALLOW_MOCK_LOGIN=true`, và API ghi cảnh báo lúc khởi động. Seed cũng từ chối chạy khi production, vì seed xóa sạch dữ liệu. Đây là chỗ duy nhất truy vấn nhân viên không lọc `congTyId` (lúc đăng nhập chưa biết công ty; `congTyId` trong token lấy từ bản ghi nhân viên, không lấy từ client).
+16. Nhiều người thực hiện dùng chung một trạng thái và một tiến độ: ai trong số họ cũng bắt đầu, cập nhật tiến độ, gửi duyệt được. Muốn theo dõi riêng từng người thì tách việc con hoặc tách công việc.
+17. Lịch sử trả đủ mọi bản ghi của một công việc (mỗi việc chỉ vài chục lần lưu), web chia trang 5 dòng. Bình luận trả 500 bản mới nhất. Chưa phân trang hai danh sách này ở server; nếu cần thì dùng `page/limit` và `{ data, meta }` như danh sách công việc.
 
 ## Câu hỏi thiết kế
 
@@ -115,12 +117,14 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 - Được: không lệch thời gian. Đúng 00:00 giờ VN là việc thành quá hạn, không phải chờ job, và không phải đổi luồng trạng thái. Một việc vừa "Đang làm" vừa "Quá hạn" là chuyện bình thường; nếu lưu thành trạng thái thì hai khái niệm này phải gộp làm một.
 - Mất: không lọc được bằng một giá trị có sẵn, và muốn gửi thông báo khi vừa quá hạn thì vẫn cần job riêng.
 - Lưu thành trạng thái thì ngược lại. Truy vấn và thông báo đơn giản hơn, nhưng cần job lúc 0h, dữ liệu sai trong khoảng giữa hai lần chạy, và mọi thao tác đổi hạn đều phải tính lại.
-- Lọc Quá hạn có phân trang: truy vấn `trangThai != HOAN_THANH` và `hanSapXep < todayInVietnam()`. `hanSapXep` bằng `hetHan`, hoặc `9999-12-31` nếu không có hạn. Đây vừa là khóa sắp xếp, vừa là khóa khoảng trong index `(congTyId, vai trò, deletedAt, hanSapXep, _id)`. Vì vậy `skip/limit` và `countDocuments` chạy trên index, không quét toàn bộ; có test `explain` khẳng định không có stage SORT hay COLLSCAN.
+- Lọc Quá hạn có phân trang: truy vấn `trangThai != HOAN_THANH` và `hanSapXep < todayInVietnam()`. `hanSapXep` bằng `hetHan`, hoặc `9999-12-31` nếu không có hạn. Đây vừa là khóa sắp xếp, vừa là khóa khoảng trong index `(congTyId, vai trò, deletedAt, hanSapXep, _id)`. Vì vậy `skip/limit` và `countDocuments` chạy trên index, không quét toàn bộ; có test `explain` khẳng định không có stage SORT hay COLLSCAN. `trangThai != HOAN_THANH` và từ khóa lọc ở bước FETCH sau khi quét index, trong phạm vi việc của một người nên nhỏ. Trang rất sâu thì `skip` tốn O(n); lúc đó chuyển sang phân trang keyset theo `(hanSapXep, _id)`, vì sắp xếp đã có `_id` làm khóa phụ.
 
 **2. Mã CV không trùng, không nhảy số.**
 - Mỗi công ty có một bản ghi bộ đếm, tăng bằng `findOneAndUpdate({$inc})`. Lệnh này nguyên tử, nên hai người bấm cùng lúc luôn nhận hai số khác nhau.
 - Mọi kiểm tra (người, dự án, ngày) chạy xong mới lấy số.
 - Tăng bộ đếm, insert công việc và ghi lịch sử nằm trong **một transaction**. Lỗi ở bất kỳ bước nào thì cả khối được hoàn tác, lượt tăng cũng mất theo, nên không có số bị bỏ trống. Có test ép bước ghi lịch sử lỗi rồi kiểm tra việc tiếp theo vẫn là số liền kề.
+- Điều kiện: Mongo có transaction (replica set của `docker compose`, hoặc Atlas). Với mongod đơn lẻ, API cảnh báo lúc khởi động và có thể nhảy số nếu bước sau lỗi, nhưng vẫn không trùng.
+- Bản ghi bộ đếm được tạo (upsert) **ngoài** transaction, vì hai upsert đồng thời trong transaction gây lỗi trùng khóa không tự thử lại được; chỉ lệnh `$inc` nằm trong transaction.
 - Unique index `(congTyId, ma)` là lưới an toàn cuối cùng.
 - Đánh đổi: bản ghi bộ đếm là điểm nóng, các transaction đồng thời gặp write conflict và driver tự thử lại. Với tốc độ tạo việc của một công ty thì chấp nhận được; có test tạo đồng thời 20 việc.
 
@@ -134,7 +138,7 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 
 **4. Thêm trường bắt buộc `loaiCongViec` mà app cũ vẫn gọi API tạo.**
 - Ở API bản hiện tại, trường này **không bắt buộc** và có mặc định phía server (vd. `KHAC`, hoặc suy ra từ dự án). App cũ không gửi vẫn tạo được.
-- Web mới bắt buộc chọn ở form, bằng schema form riêng.
+- Web mới bắt buộc chọn ở form, bằng schema form riêng đặt trong `packages/contracts` (`CreateTaskFormSchema = CreateTaskSchema.extend(...)`), không định nghĩa lại ở web.
 - Chạy migration điền giá trị cho bản ghi cũ. Repository trả mặc định nếu bản ghi thiếu trường, để client không nhận `undefined` bất ngờ.
 - Thêm header phiên bản app để đo còn bao nhiêu client cũ. Khi đủ ít và đã ép cập nhật qua "phiên bản tối thiểu", mới bắt buộc ở `/v2` hoặc theo phiên bản app, không đổi đột ngột hợp đồng v1.
 - Response có thêm trường mới là tương thích ngược, miễn app cũ bỏ qua trường lạ.
@@ -153,10 +157,11 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 |---|---|
 | `CLAUDE.md` | Luật cho phiên Claude mới: phân tầng, dạng response, xóa mềm, múi giờ, quyền theo công ty, lệnh kiểm tra, việc cấm. |
 | `settings.json` | Chỉ cho phép sẵn đúng các lệnh đọc/kiểm tra; commit, seed, cài gói phải hỏi; cấm đọc `.env`, `git push`, `reset --hard`. |
-| `hooks/block-dangerous-actions.mjs` | PreToolUse: chặn lệnh không hoàn tác được và đọc/ghi `.env`. Chạy `node .claude/hooks/test-hooks.mjs` để thử 47 ca. |
+| `hooks/block-dangerous-actions.mjs` | PreToolUse: chặn lệnh không hoàn tác được và đọc/ghi `.env`. Gọi bằng `$CLAUDE_PROJECT_DIR` nên vẫn chạy khi Claude đứng ở thư mục con. Bỏ phần commit message và mẫu grep trước khi so, để không chặn nhầm. Là lưới an toàn theo danh sách chặn, không phải sandbox. Chạy `node .claude/hooks/test-hooks.mjs` để thử 72 ca. |
 | `hooks/typecheck-before-stop.mjs` | Stop: còn file `.ts` thay đổi (kể cả file mới chưa theo dõi) mà typecheck lỗi thì không cho Claude kết thúc lượt. Có chống vòng lặp. |
 | `skills/verify` | `/verify`: chạy kiểm tra và rà checklist luật trước khi báo xong. |
 | `skills/add-task-field` | `/add-task-field`: quy trình thêm trường xuyên các tầng, có bước tương thích ngược. |
+| `launch.json` | Cấu hình preview của Claude Code: API :3000 và web :5173. |
 | `agents/rules-reviewer.md` | Subagent chỉ đọc, soát diff theo luật repo, dùng làm góc nhìn độc lập trước khi commit. |
 
 ## Xử lý sự cố
@@ -164,6 +169,14 @@ Response: `{ data }`, danh sách `{ data, meta: { page, limit, total } }`, lỗi
 - **Cổng 27017 đã có Mongo khác chạy**: tắt Mongo đó, hoặc đổi cổng trong `docker-compose.yml` và `MONGO_URL` trong `apps/api/.env`.
 - **API cảnh báo "không chạy replica set"**: đang trỏ tới mongod đơn lẻ. Dùng Mongo của `docker compose` trong repo để có transaction.
 - **Sửa `packages/contracts` mà web chưa nhận**: tắt rồi chạy lại `pnpm dev` để Vite dịch lại gói dùng chung.
+
+## Lịch sử commit
+
+Có 4 commit đặt message sai Conventional Commits, làm tay lúc deploy và chỉnh sửa. Tôi giữ nguyên vì đề yêu cầu không viết lại lịch sử (và đã push). Message đúng ra phải là:
+- `5069488 Test cong ty Long Do` → `feat(deploy): cấu hình Render/Vercel và ALLOW_MOCK_LOGIN`
+- `94da53f uda` → `style(web): chỉnh giao diện danh sách`
+- `1655247 update phần link qua list` → `feat(web): bấm cả dòng để mở công việc`
+- `0ab6c7f fixed toàn bộ phần search` → `fix: regex bỏ dấu, route dựng { data, meta }, tải lại chi tiết khi 409/404, giữ bộ lọc khi quay lại`
 
 ## Thời gian
 
