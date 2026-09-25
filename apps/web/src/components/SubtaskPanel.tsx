@@ -2,6 +2,9 @@ import { MAX_SUBTASKS, AddSubtaskSchema, type TaskDetail } from '@longdo/contrac
 import { useState, type FormEvent } from 'react'
 import { useMarkSubtask, useAddSubtask, useRemoveSubtask } from '../hooks/useTasks'
 import { EmptyState } from './LoadingState'
+import { Pagination } from './Pagination'
+
+const PAGE_SIZE = 5
 
 /**
  * Việc con: người giao thêm/xóa (khi chưa bắt đầu hoặc đang làm), người thực hiện tích xong (khi đang làm).
@@ -12,6 +15,7 @@ export function SubtaskPanel({ task }: { task: TaskDetail }) {
   const markSubtask = useMarkSubtask(task.id)
   const removeSubtask = useRemoveSubtask(task.id)
   const [name, setName] = useState('')
+  const [page, setPage] = useState(1)
   const [inputError, setInputError] = useState<string>()
   // Lỗi của thao tác GẦN NHẤT (mỗi mutation giữ error riêng tới khi gọi lại, nên không gộp bằng ??).
   const [error, setError] = useState<Error | null>(null)
@@ -20,6 +24,9 @@ export function SubtaskPanel({ task }: { task: TaskDetail }) {
   const { quanLyViecCon: canManage, danhDauViecCon: canMark } = task.quyen
   const busy = addSubtask.isPending || markSubtask.isPending || removeSubtask.isPending
   const doneCount = task.viecCon.filter((v) => v.xong).length
+  const pageCount = Math.max(1, Math.ceil(task.viecCon.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const visibleSubtasks = task.viecCon.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   const submitAdd = (e: FormEvent) => {
     e.preventDefault()
@@ -37,6 +44,7 @@ export function SubtaskPanel({ task }: { task: TaskDetail }) {
       onSuccess: () => {
         setError(null)
         setName((prev) => (prev.trim() === sent ? '' : prev))
+        setPage(Math.ceil((task.viecCon.length + 1) / PAGE_SIZE))
       },
     })
   }
@@ -58,7 +66,7 @@ export function SubtaskPanel({ task }: { task: TaskDetail }) {
         </EmptyState>
       ) : (
         <ul className="subtasks">
-          {task.viecCon.map((v) => (
+          {visibleSubtasks.map((v) => (
             <li key={v.id}>
               <label className={v.xong ? 'done' : undefined}>
                 <input
@@ -83,6 +91,17 @@ export function SubtaskPanel({ task }: { task: TaskDetail }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {task.viecCon.length > PAGE_SIZE && (
+        <Pagination
+          page={currentPage}
+          limit={PAGE_SIZE}
+          total={task.viecCon.length}
+          itemLabel="việc con"
+          compact
+          onPageChange={setPage}
+        />
       )}
 
       {canManage && task.viecCon.length < MAX_SUBTASKS && (

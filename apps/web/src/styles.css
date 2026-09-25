@@ -336,6 +336,17 @@ button.link-button {
   margin-top: 0.75rem;
 }
 
+.pagination.compact {
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  margin-left: 1rem;
+  font-size: 0.9rem;
+}
+
+.pagination.compact button {
+  padding: 0.25rem 0.65rem;
+}
+
 /* ---------- Nhãn ---------- */
 
 .badge-group {
@@ -640,12 +651,12 @@ progress {
 .subtasks {
   list-style: none;
   margin: 0 0 0.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   display: grid;
-  gap: 0.35rem;
+  overflow: hidden;
 }
 
 .subtasks li {
@@ -653,6 +664,12 @@ progress {
   justify-content: space-between;
   gap: 0.75rem;
   align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.subtasks li:last-child {
+  border-bottom: 0;
 }
 
 .subtasks label {
