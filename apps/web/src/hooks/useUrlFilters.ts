@@ -1,15 +1,18 @@
 import { TaskListQuerySchema, type TaskListQuery } from '@longdo/contracts'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { useSession } from '../auth/session'
 
 const DEFAULTS = TaskListQuerySchema.parse({})
 
-// Query string gần nhất của màn danh sách, để nút "‹ Danh sách" quay về đúng bộ lọc và trang đang xem.
-let lastListSearch = ''
+// Query string gần nhất của màn danh sách, kèm người đang xem, để nút "‹ Danh sách" quay về đúng
+// bộ lọc và trang đang xem. Đổi người đăng nhập thì không mang bộ lọc của người trước sang.
+let lastList = { uid: '', search: '' }
 
-/** Đường dẫn về màn danh sách, giữ bộ lọc lần cuối (không có thì về danh sách mặc định). */
-export function listHref(): string {
-  return lastListSearch ? `/cong-viec?${lastListSearch}` : '/cong-viec'
+/** Đường dẫn về màn danh sách, giữ bộ lọc lần cuối của người đang đăng nhập. */
+export function useListHref(): string {
+  const uid = useSession()?.nhanVien.id ?? ''
+  return lastList.uid === uid && lastList.search ? `/cong-viec?${lastList.search}` : '/cong-viec'
 }
 
 /**
@@ -18,9 +21,10 @@ export function listHref(): string {
  */
 export function useUrlFilters() {
   const [params, setParams] = useSearchParams()
+  const uid = useSession()?.nhanVien.id ?? ''
   useEffect(() => {
-    lastListSearch = params.toString()
-  }, [params])
+    lastList = { uid, search: params.toString() }
+  }, [uid, params])
 
   const filters = useMemo<TaskListQuery>(() => {
     const raw = Object.fromEntries([...params].filter(([, v]) => v !== ''))

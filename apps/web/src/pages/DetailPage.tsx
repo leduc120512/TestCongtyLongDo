@@ -10,7 +10,7 @@ import { ErrorState, Loading, EmptyState } from '../components/LoadingState'
 import { SubtaskPanel } from '../components/SubtaskPanel'
 import { useUpdateProgress, useTaskDetail, useChangeStatus, useDeleteTask } from '../hooks/useTasks'
 import { useLookup } from '../hooks/useCatalog'
-import { listHref } from '../hooks/useUrlFilters'
+import { useListHref } from '../hooks/useUrlFilters'
 
 /** Các nút thao tác. Chỉ hiện nút mà quyen cho phép; API vẫn tự chặn nếu ai đó gọi thẳng. */
 function TaskActions({
@@ -24,6 +24,7 @@ function TaskActions({
   setError: (error: Error | null) => void
 }) {
   const navigate = useNavigate()
+  const listHref = useListHref()
   const changeStatus = useChangeStatus(task.id)
   const updateProgress = useUpdateProgress(task.id)
   const deleteTask = useDeleteTask(task.id)
@@ -76,7 +77,7 @@ function TaskActions({
             disabled={busy}
             onClick={() => {
               if (window.confirm(`Xóa công việc ${task.ma}?`)) {
-                deleteTask.mutate(undefined, { onError: trackError.onError, onSuccess: () => navigate(listHref(), { replace: true }) })
+                deleteTask.mutate(undefined, { onError: trackError.onError, onSuccess: () => navigate(listHref, { replace: true }) })
               }
             }}
           >
@@ -173,6 +174,7 @@ export default function DetailPage() {
   const { id = '' } = useParams()
   const detail = useTaskDetail(id)
   const lookup = useLookup()
+  const listHref = useListHref()
   const [actionError, setActionError] = useState<Error | null>(null)
 
   if (detail.isPending) return <Loading />
@@ -184,7 +186,7 @@ export default function DetailPage() {
       return (
         <EmptyState>
           Không tìm thấy công việc, hoặc bạn không có liên quan tới công việc này.{' '}
-          <Link to={listHref()}>Về danh sách</Link>
+          <Link to={listHref}>Về danh sách</Link>
         </EmptyState>
       )
     }
@@ -195,7 +197,7 @@ export default function DetailPage() {
   return (
     <article className="detail">
       <p>
-        <Link to={listHref()}>‹ Danh sách</Link>
+        <Link to={listHref}>‹ Danh sách</Link>
       </p>
       {detail.isError && (
         <p className="error-block" role="alert">
