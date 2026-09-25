@@ -7,3 +7,6 @@ dist/
 .DS_Store
 coverage/
 .vite/
+# Cấu hình cá nhân của IDE và của Claude Code trên từng máy
+.idea/
+.claude/settings.local.json
