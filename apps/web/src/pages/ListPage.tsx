@@ -40,6 +40,13 @@ export default function ListPage() {
       setFilters({ q })
     }
   }, [debouncedKeyword, setFilters])
+  // URL đổi từ bên ngoài (bấm logo, Back/Forward) thì ô tìm lấy theo URL.
+  useEffect(() => {
+    if (filters.q !== lastSent.current) {
+      lastSent.current = filters.q
+      setKeyword(filters.q ?? '')
+    }
+  }, [filters.q])
 
   const hasExtraFilters = !!(filters.duAnId || filters.trangThai || filters.uuTien || filters.q)
   const clearFilters = () => {
@@ -154,7 +161,19 @@ export default function ListPage() {
         <ErrorState error={list.error} onRetry={retryAll} />
       ) : list.data.data.length === 0 ? (
         <EmptyState>
-          {hasExtraFilters || filters.page > 1 ? (
+          {list.data.meta.total > 0 ? (
+            // Trang đang xem vượt quá trang cuối (vd. việc vừa bị xóa, hoặc sửa tay ?page= trên URL).
+            <>
+              Trang {list.data.meta.page} không còn công việc nào.{' '}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => setFilters({ page: Math.ceil(list.data.meta.total / list.data.meta.limit) })}
+              >
+                Về trang cuối
+              </button>
+            </>
+          ) : hasExtraFilters ? (
             <>
               Không có công việc nào khớp bộ lọc.{' '}
               <button type="button" className="link-button" onClick={clearFilters}>

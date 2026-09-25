@@ -19,13 +19,13 @@ const PAGE_SIZE = 5
 
 /** Đổi giá trị thô trong lịch sử (id, enum, ngày) thành chữ người đọc được. */
 function displayValue(field: string, value: unknown, lookup: Lookup): string {
+  // Không có dự án nghĩa là "Việc chung", không phải trống.
+  if (field === 'duAnId') return lookup.projectName(value as string | null | undefined)
   if (value === null || value === undefined || value === '') return '(trống)'
   switch (field) {
     case 'nguoiThucHienIds':
     case 'nguoiTheoDoiIds':
       return (value as string[]).map(lookup.employeeName).join(', ') || '(trống)'
-    case 'duAnId':
-      return lookup.projectName(value as string)
     case 'trangThai':
       return STATUS_LABELS[value as TaskStatus] ?? String(value)
     case 'uuTien':

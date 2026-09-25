@@ -14,7 +14,6 @@ import {
   type HistoryAction,
   type HistoryEntry,
   type AuthUser,
-  type ApiListResponse,
   type UpdateTask,
   type CreateTask,
   type FieldChange,
@@ -59,17 +58,15 @@ export class TaskService {
 
   // ---------- Đọc ----------
 
-  async list(user: AuthUser, q: TaskListQuery): Promise<ApiListResponse<Task>> {
+  /** Một trang công việc và tổng số khớp bộ lọc; route tự dựng { data, meta }. */
+  async list(user: AuthUser, q: TaskListQuery): Promise<{ items: Task[]; total: number }> {
     const now = this.clock()
     const { items, total } = await this.store.tasks.list(
       { ...this.buildFilter(user, q, now), nhanh: q.nhanh },
       { page: q.page, limit: q.limit },
       q.sapXep,
     )
-    return {
-      data: items.map((task) => toTask(task, now)),
-      meta: { page: q.page, limit: q.limit, total },
-    }
+    return { items: items.map((task) => toTask(task, now)), total }
   }
 
   /** Số việc ở mỗi lọc nhanh, áp cùng các bộ lọc phụ (dự án, trạng thái, ưu tiên, từ khóa). */

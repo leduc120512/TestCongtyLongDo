@@ -119,7 +119,7 @@ describe('quyền xem', () => {
     expect(await errorCodeOf(service.get(asUser(OUTSIDER), task.id))).toBe('KHONG_TIM_THAY')
     expect(await errorCodeOf(service.history(asUser(OUTSIDER), task.id))).toBe('KHONG_TIM_THAY')
     const list = await service.list(asUser(OUTSIDER), TaskListQuerySchema.parse({}))
-    expect(list.meta.total).toBe(0)
+    expect(list.total).toBe(0)
   })
 
   it('token của công ty khác không thấy dù trùng userId', async () => {
@@ -287,7 +287,7 @@ describe('xóa mềm', () => {
     await service.remove(asUser(ASSIGNER), task.id)
     expect(store.tasks.items.get(task.id)!.deletedAt).toBeInstanceOf(Date)
     expect(await errorCodeOf(service.get(asUser(ASSIGNER), task.id))).toBe('KHONG_TIM_THAY')
-    expect((await service.list(asUser(ASSIGNER), TaskListQuerySchema.parse({}))).meta.total).toBe(0)
+    expect((await service.list(asUser(ASSIGNER), TaskListQuerySchema.parse({}))).total).toBe(0)
   })
 
   it('không xóa được việc đã hoàn thành', async () => {
@@ -319,10 +319,10 @@ describe('danh sách và Quá hạn', () => {
     now = new Date('2026-06-04T05:00:00Z') // hôm nay VN = 04/06 → 01, 02, 03 quá hạn
     const page1 = await service.list(asUser(ASSIGNER), TaskListQuerySchema.parse({ trangThai: 'QUA_HAN', limit: 2 }))
     const page2 = await service.list(asUser(ASSIGNER), TaskListQuerySchema.parse({ trangThai: 'QUA_HAN', limit: 2, page: 2 }))
-    expect(page1.meta.total).toBe(3)
-    expect(page1.data.map((x) => x.hetHan)).toEqual(['2026-06-01', '2026-06-02'])
-    expect(page2.data.map((x) => x.hetHan)).toEqual(['2026-06-03'])
-    expect([...page1.data, ...page2.data].every((x) => x.quaHan)).toBe(true)
+    expect(page1.total).toBe(3)
+    expect(page1.items.map((x) => x.hetHan)).toEqual(['2026-06-01', '2026-06-02'])
+    expect(page2.items.map((x) => x.hetHan)).toEqual(['2026-06-03'])
+    expect([...page1.items, ...page2.items].every((x) => x.quaHan)).toBe(true)
   })
 })
 

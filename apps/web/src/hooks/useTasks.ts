@@ -7,6 +7,7 @@ import type {
   CreateTask,
 } from '@longdo/contracts'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ApiError } from '../api/http'
 import { taskApi, type CountFilter } from '../api/task.api'
 import { useSession } from '../auth/session'
 
@@ -71,6 +72,22 @@ function useAfterChange() {
   }
 }
 
+/**
+ * Thao tác bị từ chối vì dữ liệu trên màn hình đã cũ (409: người khác vừa đổi trạng thái/phiên bản;
+ * 404: việc vừa bị xóa hoặc mình bị gỡ khỏi việc) thì tải lại chi tiết và lịch sử, để trang hiện
+ * đúng trạng thái và đúng nút thay vì giữ nút cũ bấm lại vẫn lỗi.
+ */
+function useRefreshOnStale(id: string) {
+  const qc = useQueryClient()
+  const uid = useUid()
+  return (error: Error) => {
+    if (error instanceof ApiError && (error.status === 409 || error.status === 404)) {
+      void qc.invalidateQueries({ queryKey: taskKeys.detail(uid, id) })
+      void qc.invalidateQueries({ queryKey: taskKeys.history(uid, id) })
+    }
+  }
+}
+
 export function useCreateTask() {
   const afterChange = useAfterChange()
   return useMutation({ mutationFn: (body: CreateTask) => taskApi.create(body), onSuccess: afterChange })
@@ -78,30 +95,41 @@ export function useCreateTask() {
 
 export function useUpdateTask(id: string) {
   const afterChange = useAfterChange()
-  return useMutation({ mutationFn: (body: UpdateTaskInput) => taskApi.update(id, body), onSuccess: afterChange })
+  const refreshOnStale = useRefreshOnStale(id)
+  return useMutation({
+    mutationFn: (body: UpdateTaskInput) => taskApi.update(id, body),
+    onSuccess: afterChange,
+    onError: refreshOnStale,
+  })
 }
 
 export function useChangeStatus(id: string) {
   const afterChange = useAfterChange()
+  const refreshOnStale = useRefreshOnStale(id)
   return useMutation({
     mutationFn: (body: ChangeStatus) => taskApi.changeStatus(id, body),
     onSuccess: afterChange,
+    onError: refreshOnStale,
   })
 }
 
 export function useUpdateProgress(id: string) {
   const afterChange = useAfterChange()
+  const refreshOnStale = useRefreshOnStale(id)
   return useMutation({
     mutationFn: (body: UpdateProgress) => taskApi.updateProgress(id, body),
     onSuccess: afterChange,
+    onError: refreshOnStale,
   })
 }
 
 export function useDeleteTask(id: string) {
   const qc = useQueryClient()
   const uid = useUid()
+  const refreshOnStale = useRefreshOnStale(id)
   return useMutation({
     mutationFn: () => taskApi.remove(id),
+    onError: refreshOnStale,
     onSuccess: () => {
       // Bỏ hẳn chi tiết và lịch sử của việc đã xóa (tải lại chỉ nhận 404), làm mới danh sách và số đếm.
       qc.removeQueries({ queryKey: taskKeys.detail(uid, id) })
@@ -117,20 +145,32 @@ export function useDeleteTask(id: string) {
 
 export function useAddSubtask(id: string) {
   const afterChange = useAfterChange()
-  return useMutation({ mutationFn: (name: string) => taskApi.addSubtask(id, name), onSuccess: afterChange })
+  const refreshOnStale = useRefreshOnStale(id)
+  return useMutation({
+    mutationFn: (name: string) => taskApi.addSubtask(id, name),
+    onSuccess: afterChange,
+    onError: refreshOnStale,
+  })
 }
 
 export function useMarkSubtask(id: string) {
   const afterChange = useAfterChange()
+  const refreshOnStale = useRefreshOnStale(id)
   return useMutation({
     mutationFn: (v: { subtaskId: string; done: boolean }) => taskApi.markSubtask(id, v.subtaskId, v.done),
     onSuccess: afterChange,
+    onError: refreshOnStale,
   })
 }
 
 export function useRemoveSubtask(id: string) {
   const afterChange = useAfterChange()
-  return useMutation({ mutationFn: (subtaskId: string) => taskApi.removeSubtask(id, subtaskId), onSuccess: afterChange })
+  const refreshOnStale = useRefreshOnStale(id)
+  return useMutation({
+    mutationFn: (subtaskId: string) => taskApi.removeSubtask(id, subtaskId),
+    onSuccess: afterChange,
+    onError: refreshOnStale,
+  })
 }
 
 // ---------- Bình luận ----------

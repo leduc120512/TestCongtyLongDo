@@ -24,13 +24,14 @@ import type { TaskService } from '../services/task.service.ts'
 
 /**
  * Route chỉ làm 3 việc: validate đầu vào bằng schema trong contracts, gọi service với req.user
- * (lấy từ token), bọc kết quả vào { data }. Không có nghiệp vụ hay truy vấn ở đây.
+ * (lấy từ token), bọc kết quả vào { data } (danh sách thì { data, meta }). Không có nghiệp vụ hay truy vấn ở đây.
  */
 export function taskRoutes(taskService: TaskService) {
   return async (app: FastifyInstance) => {
     app.get('/cong-viec', async (req): Promise<ApiListResponse<Task>> => {
       const q = validate(TaskListQuerySchema, req.query, { dropEmpty: true })
-      return taskService.list(req.user, q)
+      const { items, total } = await taskService.list(req.user, q)
+      return { data: items, meta: { page: q.page, limit: q.limit, total } }
     })
 
     app.get('/cong-viec/dem', async (req): Promise<ApiResponse<QuickFilterCounts>> => {

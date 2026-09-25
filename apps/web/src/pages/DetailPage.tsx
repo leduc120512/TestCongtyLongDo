@@ -10,9 +10,19 @@ import { ErrorState, Loading, EmptyState } from '../components/LoadingState'
 import { SubtaskPanel } from '../components/SubtaskPanel'
 import { useUpdateProgress, useTaskDetail, useChangeStatus, useDeleteTask } from '../hooks/useTasks'
 import { useLookup } from '../hooks/useCatalog'
+import { listHref } from '../hooks/useUrlFilters'
 
 /** Các nút thao tác. Chỉ hiện nút mà quyen cho phép; API vẫn tự chặn nếu ai đó gọi thẳng. */
-function TaskActions({ task }: { task: TaskDetail }) {
+function TaskActions({
+  task,
+  error,
+  setError,
+}: {
+  task: TaskDetail
+  /** Lỗi của thao tác gần nhất. Giữ ở trang cha để không mất khi khối này dựng lại sau khi tải lại dữ liệu. */
+  error: Error | null
+  setError: (error: Error | null) => void
+}) {
   const navigate = useNavigate()
   const changeStatus = useChangeStatus(task.id)
   const updateProgress = useUpdateProgress(task.id)
@@ -20,8 +30,7 @@ function TaskActions({ task }: { task: TaskDetail }) {
   const [progress, setProgress] = useState(task.tienDo)
   const [reason, setReason] = useState('')
   const dialogRef = useRef<HTMLDialogElement>(null)
-  // Lỗi của thao tác gần nhất (mỗi mutation giữ error riêng nên không gộp bằng ??).
-  const [error, setError] = useState<Error | null>(null)
+  // Mỗi mutation giữ error riêng nên không gộp bằng ??; chỉ hiện lỗi của thao tác gần nhất.
   const trackError = { onError: (e: Error) => setError(e), onSuccess: () => setError(null) }
 
   const { quyen: permissions } = task
@@ -67,7 +76,7 @@ function TaskActions({ task }: { task: TaskDetail }) {
             disabled={busy}
             onClick={() => {
               if (window.confirm(`Xóa công việc ${task.ma}?`)) {
-                deleteTask.mutate(undefined, { onError: trackError.onError, onSuccess: () => navigate('/cong-viec', { replace: true }) })
+                deleteTask.mutate(undefined, { onError: trackError.onError, onSuccess: () => navigate(listHref(), { replace: true }) })
               }
             }}
           >
@@ -111,7 +120,8 @@ function TaskActions({ task }: { task: TaskDetail }) {
         </p>
       )}
 
-      <dialog ref={dialogRef} className="dialog" onClose={() => setReason('')}>
+      {/* Chỉ xóa lý do khi trả lại thành công hoặc bấm Hủy: API lỗi thì mở lại vẫn còn chữ đã gõ. */}
+      <dialog ref={dialogRef} className="dialog">
         <form
           method="dialog"
           onSubmit={(e) => {
@@ -119,7 +129,10 @@ function TaskActions({ task }: { task: TaskDetail }) {
               e.preventDefault()
               return
             }
-            changeStatus.mutate({ trangThai: 'DANG_LAM', lyDo: reason.trim() }, trackError)
+            changeStatus.mutate(
+              { trangThai: 'DANG_LAM', lyDo: reason.trim() },
+              { onError: trackError.onError, onSuccess: () => { trackError.onSuccess(); setReason('') } },
+            )
           }}
         >
           <h2>Trả lại công việc {task.ma}</h2>
@@ -130,6 +143,7 @@ function TaskActions({ task }: { task: TaskDetail }) {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Vd. Thiếu biên bản nghiệm thu có chữ ký tư vấn giám sát"
+            maxLength={1000}
             required
             autoFocus
           />
@@ -138,7 +152,14 @@ function TaskActions({ task }: { task: TaskDetail }) {
             <button type="submit" disabled={!reason.trim()}>
               Trả lại
             </button>
-            <button type="button" className="secondary" onClick={() => dialogRef.current?.close()}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                setReason('')
+                dialogRef.current?.close()
+              }}
+            >
               Hủy
             </button>
           </div>
@@ -152,15 +173,18 @@ export default function DetailPage() {
   const { id = '' } = useParams()
   const detail = useTaskDetail(id)
   const lookup = useLookup()
+  const [actionError, setActionError] = useState<Error | null>(null)
 
   if (detail.isPending) return <Loading />
-  if (detail.isError) {
-    // 404: không tồn tại / không liên quan; 400: id sai định dạng — thử lại cũng vô ích.
-    if (detail.error instanceof ApiError && (detail.error.status === 404 || detail.error.status === 400)) {
+  // 404: không tồn tại / không liên quan / vừa bị xóa; 400: id sai định dạng — thử lại cũng vô ích.
+  const notFound = detail.error instanceof ApiError && (detail.error.status === 404 || detail.error.status === 400)
+  // Tải lại nền bị lỗi mà đã có dữ liệu thì giữ trang, chỉ báo lỗi phía trên.
+  if (detail.isError && (notFound || !detail.data)) {
+    if (notFound) {
       return (
         <EmptyState>
           Không tìm thấy công việc, hoặc bạn không có liên quan tới công việc này.{' '}
-          <Link to="/cong-viec">Về danh sách</Link>
+          <Link to={listHref()}>Về danh sách</Link>
         </EmptyState>
       )
     }
@@ -171,8 +195,16 @@ export default function DetailPage() {
   return (
     <article className="detail">
       <p>
-        <Link to="/cong-viec">‹ Danh sách</Link>
+        <Link to={listHref()}>‹ Danh sách</Link>
       </p>
+      {detail.isError && (
+        <p className="error-block" role="alert">
+          Không tải lại được dữ liệu mới nhất: {detail.error.message}{' '}
+          <button type="button" className="link-button" onClick={() => detail.refetch()}>
+            Thử lại
+          </button>
+        </p>
+      )}
       {lookup.error && (
         <p className="error-block" role="alert">
           Không tải được tên nhân viên/dự án: {lookup.error.message}{' '}
@@ -190,7 +222,7 @@ export default function DetailPage() {
       </header>
 
       {/* key: đổi trạng thái/tiến độ từ nơi khác thì form tiến độ lấy lại giá trị mới */}
-      <TaskActions key={`${task.trangThai}-${task.tienDo}`} task={task} />
+      <TaskActions key={`${task.trangThai}-${task.tienDo}`} task={task} error={actionError} setError={setActionError} />
 
       <dl className="info-grid">
         <dt>Dự án</dt>

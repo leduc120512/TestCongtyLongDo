@@ -11,9 +11,11 @@ export default function EditPage() {
   const updateTask = useUpdateTask(id)
 
   if (detail.isPending) return <Loading />
-  if (detail.isError) {
-    // 404: không tồn tại / không liên quan; 400: id sai định dạng — thử lại cũng vô ích.
-    if (detail.error instanceof ApiError && (detail.error.status === 404 || detail.error.status === 400)) {
+  // 404: không tồn tại / không liên quan; 400: id sai định dạng — thử lại cũng vô ích.
+  const notFound = detail.error instanceof ApiError && (detail.error.status === 404 || detail.error.status === 400)
+  // Tải lại nền lỗi mà đã có dữ liệu thì giữ form (không mất chữ đang gõ).
+  if (detail.isError && (notFound || !detail.data)) {
+    if (notFound) {
       return (
         <EmptyState>
           Không tìm thấy công việc. <Link to="/cong-viec">Về danh sách</Link>

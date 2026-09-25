@@ -4,12 +4,23 @@ import { useSearchParams } from 'react-router'
 
 const DEFAULTS = TaskListQuerySchema.parse({})
 
+// Query string gần nhất của màn danh sách, để nút "‹ Danh sách" quay về đúng bộ lọc và trang đang xem.
+let lastListSearch = ''
+
+/** Đường dẫn về màn danh sách, giữ bộ lọc lần cuối (không có thì về danh sách mặc định). */
+export function listHref(): string {
+  return lastListSearch ? `/cong-viec?${lastListSearch}` : '/cong-viec'
+}
+
 /**
  * Bộ lọc danh sách nằm trên URL (?nhanh=...&trangThai=...) để tải lại trang hay gửi link vẫn giữ.
  * Parse bằng chính schema trong contracts; giá trị lạ trên URL thì bỏ qua, dùng mặc định.
  */
 export function useUrlFilters() {
   const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    lastListSearch = params.toString()
+  }, [params])
 
   const filters = useMemo<TaskListQuery>(() => {
     const raw = Object.fromEntries([...params].filter(([, v]) => v !== ''))
